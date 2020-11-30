@@ -57,7 +57,7 @@ let reserved_word_list =
    "unquote-splicing"];;  
 
 (* work on the tag parser starts here *)
-
+let is_reserved_symbol sym = List.exists (fun v-> sym = v) reserved_word_list
 let rec tag_parse = function 
   (* |Pair(Symbol("if"), Pair(test, Pair(dit, Pair(dif, Nil))))->If(tag_parse test, tag_parse dit, tag_parse dif) *)
   |Pair(Symbol("quote"), Pair(x, Nil)) -> Const(Sexpr(x))
@@ -66,12 +66,23 @@ let rec tag_parse = function
   |Char(x) -> Const(Sexpr(Char(x)))
   |Bool(x) -> Const(Sexpr(Bool(x)))
   |Symbol(x) -> 
-                (if (List.exists (fun v-> x = v) reserved_word_list) then raise X_syntax_error
+                (if (is_reserved_symbol x) then raise X_syntax_error
                  else  Var x)
   |Pair(Symbol("if"), Pair(test, Pair(dit, Pair(dif, Nil)))) -> If(tag_parse test, tag_parse dit, tag_parse dif)  (* if test dit dif *)
   |Pair(Symbol("if"), Pair(test, Pair(dit, Nil))) -> If(tag_parse test, tag_parse dit, Const(Void))              (* if test then *)
   |Pair(Symbol ("lambda"), Pair(arglist, Pair( exp, Nil))) -> parsing_lambda (Pair (arglist,exp))
+  |Pair(Symbol ("or"), expr_list) -> Or (tag_parse_list_from_pair expr_list)
 
+                (* VVVV should be last I think or change the error to compute it if it is a reserved word - Raviv*)
+  | Pair(Symbol(function_name),arg_list) -> (if (is_reserved_symbol function_name) then raise X_syntax_error 
+                                else let args= tag_parse_list_from_pair arg_list in
+                                let function_name_expr=Const(Sexpr(Symbol(function_name))) in  (* check if this should be the wrapper for fun name! - Raviv *)
+                                Applic (function_name_expr,args))
+
+  and tag_parse_list_from_pair x= 
+                let lst =convert_to_list x in
+                List.map (fun a-> (tag_parse a)) lst 
+                        
   and proper_list = function                    (*check the list for the lambda*)
     |Nil -> true 
     |Pair (l,r) -> proper_list(r)
@@ -130,4 +141,3 @@ let rec tag_parse = function
 let tag_parse_expression sexpr = tag_parse sexpr;;
 let tag_parse_expressions sexpr = List.map tag_parse sexpr;;
 end;; (* struct Tag_Parser *)
-
