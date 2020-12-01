@@ -61,14 +61,11 @@ let reserved_word_list =
 let is_reserved_symbol sym = List.exists (fun v-> sym = v) reserved_word_list
 let rec tag_parse = function 
   (* |Pair(Symbol("if"), Pair(test, Pair(dit, Pair(dif, Nil))))->If(tag_parse test, tag_parse dit, tag_parse dif) *)
-  |Pair(Symbol("quasiquote"), Pair(x, Nil)) -> (tag_parse (eval_QQ x))
   |Number(x) -> Const(Sexpr(Number(x)))
   |String(x) -> Const(Sexpr(String(x)))
   |Char(x) -> Const(Sexpr(Char(x)))
   |Bool(x) -> Const(Sexpr(Bool(x)))
-  |Symbol(x) -> 
-                (if (is_reserved_symbol x) then raise X_syntax_error
-                 else  Var x)
+  |Nil -> Const(Sexpr(Nil))
   |Pair(Symbol("if"), Pair(test, Pair(dit, Pair(dif, Nil)))) -> If(tag_parse test, tag_parse dit, tag_parse dif)  (* if test dit dif *)
   |Pair(Symbol("if"), Pair(test, Pair(dit, Nil))) -> If(tag_parse test, tag_parse dit, Const(Void))              (* if test then *)
   |Pair(Symbol ("lambda"), Pair(arglist, Pair( exp, Nil))) -> parsing_lambda (Pair (arglist,exp))
@@ -77,12 +74,29 @@ let rec tag_parse = function
   |Pair(Symbol "set!", Pair(x, Pair(exp, Nil)))-> Set(tag_parse x, tag_parse exp)
   |Pair(Symbol("quote"), Pair(x, Nil)) -> Const(Sexpr(x))
   |Pair(Symbol "begin",explist)-> Seq(sequnce_complete (convert_to_list explist))
+  |Pair(Symbol ("quasiquote"), Pair (x , Nil)) -> tag_parse (evallll (x))
                 (* VVVV should be last I think or change the error to compute it if it is a reserved word - Raviv*)
   |Pair(function_applic,arg_list) ->
                                 let parsed_function= tag_parse function_applic in
                                 let args= tag_parse_list_from_pair arg_list in
                                 Applic (parsed_function,args)
-  |_ -> raise  X_syntax_error
+
+  |Symbol(x) -> 
+                                (if (is_reserved_symbol x) then raise X_syntax_error
+                                 else  Var x)
+
+and evallll x =
+match x with 
+  |Nil -> Nil 
+  |Pair(Symbol ("unquote"), Pair(a, Nil))-> a 
+  |Pair(Symbol ("unquote-splicing"), Pair(a, Nil))-> a
+  |Pair(Pair(Symbol ("unquote"), Pair(l, Nil)), b)-> Pair(Symbol ("cons"),Pair (l, Pair( (evallll b),Nil)))  
+  |Pair(Pair(Symbol ("unquote"), a), b)-> Pair(Symbol "cons",Pair (a, Pair( (evallll b),Nil)))
+  |Pair(Pair(Symbol ("unquote-splicing") , Pair(s, Nil)), b) -> Pair(Symbol ("append"),Pair( s,Pair( (evallll b), Nil)))  
+  |Pair(Pair(Symbol ("unquote-splicing") ,s), b)-> Pair(Symbol "append",Pair( s,Pair( (evallll b), Nil)))
+  |Pair(Pair(a, b),c) ->  Pair(Symbol "cons", Pair(Pair (Symbol "cons", Pair(evallll a, Pair(evallll b , Nil))), Pair((evallll c), Nil)))
+  |Pair(not_unquote, b) ->  Pair(Symbol "cons", Pair(Pair (Symbol "quote", Pair( not_unquote, Nil)), Pair((evallll b),Nil))) 
+  |quot-> (Pair (Symbol "quote", Pair( quot, Nil)))
 
   and tag_parse_list_from_pair x= 
                 let lst =convert_to_list x in
@@ -118,7 +132,7 @@ let rec tag_parse = function
   and sequence_flat =function 
     | []-> []
     | Seq(x) :: tail -> List.append x (sequence_flat tail)
-    | hd::tl -> List.append [hd] (sequence_flat tl)
+    | hd::tl -> List.append [hd] (sequence_flat tl) 
     
   and sequnce_complete body= sequence_flat (tmp_sequence body)
       (* check for duplicate in the are list  *)
@@ -153,17 +167,6 @@ let rec tag_parse = function
                   else LambdaOpt (args, last_arg, body)
   |_ -> raise X_syntax_error
   (* quasiquote macro exception *)
-  and eval_QQ = function 
-  |Nil -> Nil
-  |Pair(Symbol "unquote", Pair(a, Nil))-> a
-  |Pair(Symbol "unquote-splicing", Pair(a, Nil))-> a
-  |Pair(Pair(Symbol "unquote", Pair(l, Nil)), b)-> Pair(Symbol "cons",Pair (l, Pair( (eval_QQ b),Nil)))  
-  |Pair(Pair(Symbol "unquote", a), b)-> Pair(Symbol "cons",Pair (a, Pair( (eval_QQ b),Nil)))
-  |Pair(Pair(Symbol "unquote-splicing", Pair(s, Nil)), b)-> Pair(Symbol "append",Pair( s,Pair( (eval_QQ b), Nil)))  
-  |Pair(Pair(Symbol "unquote-splicing",s), b)-> Pair(Symbol "append",Pair( s,Pair( (eval_QQ b), Nil)))
-  |Pair(Pair(a, b),c) ->  Pair(Symbol "cons", Pair(Pair (Symbol "cons", Pair(eval_QQ a, Pair(eval_QQ b , Nil))), Pair((eval_QQ c), Nil)))
-  |Pair(not_unquote, b) ->  Pair(Symbol "cons", Pair(Pair (Symbol "quote", Pair( not_unquote, Nil)), Pair((eval_QQ b),Nil)))
-  |quot-> (Pair (Symbol "quote", Pair( quot, Nil))) 
   
 ;;
 
