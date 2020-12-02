@@ -1,5 +1,5 @@
 #use "reader.ml";;
-
+open Tag_Parser;;
 type constant =
   | Sexpr of sexpr
   | Void
@@ -75,8 +75,9 @@ let rec tag_parse = function
   |Pair(Symbol("quote"), Pair(x, Nil)) -> Const(Sexpr(x))
   |Pair(Symbol "begin",explist)-> Seq(sequnce_complete (convert_to_list explist))
   |Pair(Symbol ("quasiquote"), Pair (x , Nil)) -> tag_parse (evallll (x))
-  |Pair(Symbol "let", Pair(Nil, Pair(body, Nil)))-> Applic (tag_parse (Pair(Symbol "lambda",Pair(Nil, Pair(body, Nil)))),[])
   |Pair(Symbol("let"), x) -> expend_let x
+  |Pair(Symbol "let*" ,x)->  tag_parse (kleene_let x)
+  (* |Pair(Symbol "cond", Pair(first,rest))-> tag_parse (cond_exp first,rest) *)
                 (* VVVV should be last I think or change the error to compute it if it is a reserved word - Raviv*)
   |Pair(function_applic,arg_list) ->
                                 let parsed_function= tag_parse function_applic in
@@ -86,6 +87,25 @@ let rec tag_parse = function
   |Symbol(x) -> 
                                 (if (is_reserved_symbol x) then raise X_syntax_error
                                  else  Var x)
+
+
+Pair(Pair(Pair(Symbol "eq?", Pair(Symbol "x", Pair(Number (Fraction(6, 1)), Nil))), Pair(Number (Fraction(6, 1)), Nil)), 
+Pair(Pair(Pair(Symbol "eq?", Pair(Symbol "x", Pair(Number (Fraction(5, 1)), Nil))), Pair(Symbol "=>", Pair(Pair(Symbol "lambda", Pair(Pair(Symbol "x", Nil), Pair(Number (Fraction(10, 1)), Nil))), Nil))),
+Pair(Pair(Symbol "else", Pair(Number (Fraction(7, 1)), Nil)), Nil)))
+  (* and cond_exp first rest= 
+    match rest with
+    |Nil -> (cond_last_one last_one)
+    |Pair(hd,tl)-> 
+                  let dif = (cond_exp tl) in 
+                  (cond_head_with_parsed_then first dif)
+
+  and cond_last_one last_one=
+    
+  and cond_rib1 x=
+  and cond_rib2 x=
+  and cond_rib3 x= *)
+
+
 
 and evallll x =
 match x with 
@@ -171,21 +191,30 @@ match x with
   (* quasiquote macro exception *)
   
  and expend_let = function
- |Pair (ribs,body)-> Applic (tag_parse (Pair (Symbol ("lambda"),Pair((get_params ribs), body))),(tag_parse_list_from_pair ribs )) 
+ |Pair (Nil, body)  ->Applic (tag_parse (Pair(Symbol "lambda",Pair(Nil, body))),[])
+ |Pair (ribs,body)-> Applic (tag_parse (Pair (Symbol ("lambda"),Pair((get_params ribs), body))),(tag_parse_list_from_pair (get_exp ribs ))) 
  |_->raise X_syntax_error
 
  and get_params = function
  |Nil->Nil
- |Pair(Pair(symb, vl), ribs)->Pair (symb, (get_params ribs))
+ |Pair(Pair(symb, vl), ribs)->Pair (symb,get_params ribs)
  |_ -> raise X_syntax_error
 
  and get_exp = function
  |Nil->Nil
  |Pair(Pair(symb ,Pair(vl, Nil)),ribs) ->Pair(vl,get_exp ribs)
  |_ -> raise X_syntax_error
-;;
+and kleene_let = function
+  |Pair(Nil,body)-> Pair(Symbol "let", Pair(Nil,body))
+  |Pair(Pair(Pair(sym,exp),Nil),body)-> Pair(Symbol "let",Pair(Pair(Pair(sym,exp),Nil),body))
+  |Pair(Pair(Pair(sym,exp),rest),body)->
+                                        let cont = Pair(rest, body)in
+                                        (Pair (Symbol "let",Pair(Pair(Pair(sym,exp),Nil),Pair(kleene_let cont,Nil))))
+  |_-> raise X_whyyyyyyyyy
+ ;;
 
 
 let tag_parse_expression sexpr = tag_parse sexpr;;
 let tag_parse_expressions sexpr = List.map tag_parse sexpr;;
 end;; (* struct Tag_Parser *)
+
