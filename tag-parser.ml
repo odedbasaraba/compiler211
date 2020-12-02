@@ -1,5 +1,4 @@
 #use "reader.ml";;
-open Tag_Parser;;
 type constant =
   | Sexpr of sexpr
   | Void
@@ -68,7 +67,7 @@ let rec tag_parse = function
   |Nil -> Const(Sexpr(Nil))
   |Pair(Symbol("if"), Pair(test, Pair(dit, Pair(dif, Nil)))) -> If(tag_parse test, tag_parse dit, tag_parse dif)  (* if test dit dif *)
   |Pair(Symbol("if"), Pair(test, Pair(dit, Nil))) -> If(tag_parse test, tag_parse dit, Const(Void))              (* if test then *)
-  |Pair(Symbol ("lambda"), Pair(arglist, Pair( exp, Nil))) -> parsing_lambda (Pair (arglist,exp))
+  |Pair(Symbol ("lambda"), Pair(arglist, Pair( exp, Nil))) -> parsing_lambda (Pair (arglist, Pair( exp, Nil)))
   |Pair(Symbol ("or"), expr_list) -> Or (tag_parse_list_from_pair expr_list)
   |Pair(Symbol "define", Pair(name, Pair(expr, Nil)))-> Def (tag_parse name, tag_parse expr)
   |Pair(Symbol "set!", Pair(x, Pair(exp, Nil)))-> Set(tag_parse x, tag_parse exp)
@@ -89,9 +88,9 @@ let rec tag_parse = function
                                  else  Var x)
 
 
-Pair(Pair(Pair(Symbol "eq?", Pair(Symbol "x", Pair(Number (Fraction(6, 1)), Nil))), Pair(Number (Fraction(6, 1)), Nil)), 
+(* Pair(Pair(Pair(Symbol "eq?", Pair(Symbol "x", Pair(Number (Fraction(6, 1)), Nil))), Pair(Number (Fraction(6, 1)), Nil)), 
 Pair(Pair(Pair(Symbol "eq?", Pair(Symbol "x", Pair(Number (Fraction(5, 1)), Nil))), Pair(Symbol "=>", Pair(Pair(Symbol "lambda", Pair(Pair(Symbol "x", Nil), Pair(Number (Fraction(10, 1)), Nil))), Nil))),
-Pair(Pair(Symbol "else", Pair(Number (Fraction(7, 1)), Nil)), Nil)))
+Pair(Pair(Symbol "else", Pair(Number (Fraction(7, 1)), Nil)), Nil))) *)
   (* and cond_exp first rest= 
     match rest with
     |Nil -> (cond_last_one last_one)
