@@ -75,6 +75,8 @@ let rec tag_parse = function
   |Pair(Symbol("quote"), Pair(x, Nil)) -> Const(Sexpr(x))
   |Pair(Symbol "begin",explist)-> Seq(sequnce_complete (convert_to_list explist))
   |Pair(Symbol ("quasiquote"), Pair (x , Nil)) -> tag_parse (evallll (x))
+  |Pair(Symbol "let", Pair(Nil, Pair(body, Nil)))-> Applic (tag_parse (Pair(Symbol "lambda",Pair(Nil, Pair(body, Nil)))),[])
+  |Pair(Symbol("let"), x) -> expend_let x
                 (* VVVV should be last I think or change the error to compute it if it is a reserved word - Raviv*)
   |Pair(function_applic,arg_list) ->
                                 let parsed_function= tag_parse function_applic in
@@ -168,6 +170,19 @@ match x with
   |_ -> raise X_syntax_error
   (* quasiquote macro exception *)
   
+ and expend_let = function
+ |Pair (ribs,body)-> Applic (tag_parse (Pair (Symbol ("lambda"),Pair((get_params ribs), body))),(tag_parse_list_from_pair ribs )) 
+ |_->raise X_syntax_error
+
+ and get_params = function
+ |Nil->Nil
+ |Pair(Pair(symb, vl), ribs)->Pair (symb, (get_params ribs))
+ |_ -> raise X_syntax_error
+
+ and get_exp = function
+ |Nil->Nil
+ |Pair(Pair(symb ,Pair(vl, Nil)),ribs) ->Pair(vl,get_exp ribs)
+ |_ -> raise X_syntax_error
 ;;
 
 
