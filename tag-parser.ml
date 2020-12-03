@@ -120,7 +120,7 @@ let rec tag_parse = function
   |Nil -> Const(Sexpr(Nil))
   |Pair(Symbol("if"), Pair(test, Pair(dit, Pair(dif, Nil)))) -> If(tag_parse test, tag_parse dit, tag_parse dif)  (* if test dit dif *)
   |Pair(Symbol("if"), Pair(test, Pair(dit, Nil))) -> If(tag_parse test, tag_parse dit, Const(Void))              (* if test then *)
-  |Pair(Symbol ("lambda"), Pair(arglist, Pair( exp, Nil))) -> parsing_lambda (Pair (arglist,Pair( exp, Nil)))
+  |Pair(Symbol ("lambda"),x) -> parsing_lambda x
   |Pair(Symbol ("or"), expr_list) -> Or (tag_parse_list_from_pair expr_list)
   |Pair(Symbol "define", Pair(name, Pair(expr, Nil)))-> Def (tag_parse name, tag_parse expr)
   |Pair(Symbol "set!", Pair(x, Pair(exp, Nil)))-> Set(tag_parse x, tag_parse exp)
