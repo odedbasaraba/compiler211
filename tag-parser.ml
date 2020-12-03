@@ -1,4 +1,5 @@
 #use "reader.ml";;
+(* open Tag_Parser;; *)
 type constant =
   | Sexpr of sexpr
   | Void
@@ -57,7 +58,59 @@ let reserved_word_list =
    "unquote-splicing"];;  
 
 (* work on the tag parser starts here *)
-let is_reserved_symbol sym = List.exists (fun v-> sym = v) reserved_word_list
+
+
+
+let cond_rib_seq body = Pair(Symbol ("begin"),body);;
+let cond_rib2 test foo = Pair(foo,test) ;;
+let get_rib_1_or_2 rib = match rib with 
+                        | Pair(expr,Pair(Symbol "=>",foo))->(cond_rib2 expr foo)
+                        | Pair(expr,body)->(cond_rib_seq body)
+                        |_-> raise X_syntax_error;;
+
+
+
+
+let rec cond_exp_rec cond= 
+match cond with
+|Pair(first,Nil) -> (cond_last_one first)
+|Pair(hd,tl)-> 
+              (cond_head_with_parsed_then hd (cond_exp_rec tl))
+ |_-> raise X_syntax_error
+
+and cond_last_one last_one= 
+  match last_one with
+  |Pair(Symbol "else", rib) -> cond_rib_seq rib
+  | _ -> Pair(Symbol("if"),Pair((get_cond_test last_one), Pair((get_rib_1_or_2 last_one), Nil)))
+
+and cond_head_with_parsed_then rib rest  =
+  Pair(Symbol("if"),Pair((get_cond_test rib), Pair((get_rib_1_or_2 rib), Pair(rest , Nil)))) 
+  
+and get_cond_test rib = 
+  match rib with 
+  | Pair(x,_)->x
+  |_ -> raise X_syntax_error;;
+
+
+let cond_last_one_no_else last_one= 
+  match last_one with 
+  | Pair(Symbol "else", _)->raise X_syntax_error
+  | _-> Pair(Symbol("if"),Pair((get_cond_test last_one), Pair((get_rib_1_or_2 last_one), Nil)));; 
+let  cond_exp_first cond= 
+  match cond with
+  |Pair(first,Nil) -> (cond_last_one_no_else first)
+  |Pair(first,rest)-> (cond_exp_rec (Pair(first,rest)))
+  |_-> raise X_syntax_error;;
+
+
+
+
+
+
+
+
+
+let is_reserved_symbol sym = List.exists (fun v-> sym = v) reserved_word_list;;
 let rec tag_parse = function 
   (* |Pair(Symbol("if"), Pair(test, Pair(dit, Pair(dif, Nil))))->If(tag_parse test, tag_parse dit, tag_parse dif) *)
   |Number(x) -> Const(Sexpr(Number(x)))
@@ -67,7 +120,7 @@ let rec tag_parse = function
   |Nil -> Const(Sexpr(Nil))
   |Pair(Symbol("if"), Pair(test, Pair(dit, Pair(dif, Nil)))) -> If(tag_parse test, tag_parse dit, tag_parse dif)  (* if test dit dif *)
   |Pair(Symbol("if"), Pair(test, Pair(dit, Nil))) -> If(tag_parse test, tag_parse dit, Const(Void))              (* if test then *)
-  |Pair(Symbol ("lambda"), Pair(arglist, Pair( exp, Nil))) -> parsing_lambda (Pair (arglist, Pair( exp, Nil)))
+  |Pair(Symbol ("lambda"), Pair(arglist, Pair( exp, Nil))) -> parsing_lambda (Pair (arglist,exp))
   |Pair(Symbol ("or"), expr_list) -> Or (tag_parse_list_from_pair expr_list)
   |Pair(Symbol "define", Pair(name, Pair(expr, Nil)))-> Def (tag_parse name, tag_parse expr)
   |Pair(Symbol "set!", Pair(x, Pair(exp, Nil)))-> Set(tag_parse x, tag_parse exp)
@@ -76,7 +129,8 @@ let rec tag_parse = function
   |Pair(Symbol ("quasiquote"), Pair (x , Nil)) -> tag_parse (evallll (x))
   |Pair(Symbol("let"), x) -> expend_let x
   |Pair(Symbol "let*" ,x)->  tag_parse (kleene_let x)
-  (* |Pair(Symbol "cond", Pair(first,rest))-> tag_parse (cond_exp first,rest) *)
+  |Pair(Symbol "cond",body)->tag_parse (cond_exp_first body)
+
                 (* VVVV should be last I think or change the error to compute it if it is a reserved word - Raviv*)
   |Pair(function_applic,arg_list) ->
                                 let parsed_function= tag_parse function_applic in
@@ -87,22 +141,8 @@ let rec tag_parse = function
                                 (if (is_reserved_symbol x) then raise X_syntax_error
                                  else  Var x)
 
+  
 
-(* Pair(Pair(Pair(Symbol "eq?", Pair(Symbol "x", Pair(Number (Fraction(6, 1)), Nil))), Pair(Number (Fraction(6, 1)), Nil)), 
-Pair(Pair(Pair(Symbol "eq?", Pair(Symbol "x", Pair(Number (Fraction(5, 1)), Nil))), Pair(Symbol "=>", Pair(Pair(Symbol "lambda", Pair(Pair(Symbol "x", Nil), Pair(Number (Fraction(10, 1)), Nil))), Nil))),
-Pair(Pair(Symbol "else", Pair(Number (Fraction(7, 1)), Nil)), Nil))) *)
-  (* and cond_exp first rest= 
-    match rest with
-    |Nil -> (cond_last_one last_one)
-    |Pair(hd,tl)-> 
-                  let dif = (cond_exp tl) in 
-                  (cond_head_with_parsed_then first dif)
-
-  and cond_last_one last_one=
-    
-  and cond_rib1 x=
-  and cond_rib2 x=
-  and cond_rib3 x= *)
 
 
 
@@ -217,3 +257,6 @@ let tag_parse_expression sexpr = tag_parse sexpr;;
 let tag_parse_expressions sexpr = List.map tag_parse sexpr;;
 end;; (* struct Tag_Parser *)
 
+
+
+  
