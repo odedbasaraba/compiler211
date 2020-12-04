@@ -82,8 +82,10 @@ let get_rib_1_or_2 rib rest =
     
 let rec cond_exp_rec cond= 
   match cond with
+  | Pair(Symbol "else", rib) -> (cond_rib_seq rib)
   |Pair(first,Nil) -> (cond_last_one first)
   | Pair(first,rest) -> (get_rib_1_or_2 first (cond_exp_rec rest))
+
   |_-> raise X_syntax_error
 
 and cond_last_one last_one= 
@@ -288,4 +290,46 @@ end;; (* struct Tag_Parser *)
 
 
 
-  
+  (* condVV *)
+let cond_rib_seq body = Pair(Symbol ("begin"),body);;
+let cond_rib1 expr body rest = 
+  match rest with  
+  |Nil ->Pair(Symbol "if",Pair(expr,Pair((cond_rib_seq body),Nil)))
+  |_ ->  Pair(Symbol "if",Pair(expr,Pair((cond_rib_seq body), Pair(rest , Nil))));;
+
+
+let cond_rib2 expr expr_f rest = 
+  match rest with 
+  |Nil ->Pair(Symbol "let", Pair(Pair(Pair(Symbol "value", Pair(expr, Nil)), Pair(Pair(Symbol "f", Pair(Pair(Symbol "lambda", Pair(Nil, Pair(expr_f, Nil))), Nil)), Nil)), Pair(Pair(Symbol "if", Pair(Symbol "value", Pair(Pair(Pair(Symbol "f", Nil), Pair(Symbol "value", Nil)), Nil))), Nil)))
+  |_ ->  Pair(Symbol "let", Pair(Pair(Pair(Symbol "value", Pair(expr, Nil)), Pair(Pair(Symbol "f", Pair(Pair(Symbol "lambda", Pair(Nil, Pair(expr_f, Nil))), Nil)), Pair(Pair(Symbol "rest", Pair(Pair(Symbol "lambda", Pair(Nil, Pair(rest, Nil))), Nil)), Nil))), Pair(Pair(Symbol "if", Pair(Symbol "value", Pair(Pair(Pair(Symbol "f", Nil), Pair(Symbol "value", Nil)), Pair(Pair(Symbol "rest", Nil), Nil)))), Nil)));;
+let get_rib_1_or_2 rib rest = 
+  match rib with
+    |Pair(expr,Pair(Symbol "=>",Pair(foo,Nil)))-> (cond_rib2 expr foo rest)
+    |Pair(expr,body)->(cond_rib1 expr body rest)
+    |_ -> raise X_whyyyyyyyyy;;
+
+    
+let rec cond_exp_rec cond= 
+  match cond with
+  |Pair(first,Nil) -> (cond_last_one first)
+  |Pair(Pair(Symbol "else", rib),rest) -> (cond_rib_seq rib)
+  |Pair(first,rest) -> (get_rib_1_or_2 first (cond_exp_rec rest))
+
+  |_-> raise X_syntax_error
+
+and cond_last_one last_one= 
+  match last_one with
+  | Pair(Symbol "else", rib) -> (cond_rib_seq rib)
+  | _-> (get_rib_1_or_2 last_one Nil);;
+
+let cond_last_one_no_else last_one= 
+  match last_one with 
+  | Pair(Symbol "else", _)->raise X_syntax_error
+  | _-> (get_rib_1_or_2 last_one Nil)
+
+
+let  cond_exp_first cond= 
+  match cond with
+  |Pair(first,Nil) -> (cond_last_one_no_else first)
+  |Pair(first,rest)-> (cond_exp_rec (Pair(first,rest)))
+  |_-> raise X_syntax_error;;
