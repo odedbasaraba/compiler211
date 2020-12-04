@@ -53,7 +53,7 @@ module Tag_Parser : TAG_PARSER = struct
 
 let reserved_word_list =
   ["and"; "begin"; "cond"; "define"; "else";
-   "if"; "lambda"; "let"; "let*"; "letrec"; "or";
+   "if";"lambda" ;"let"; "let*"; "letrec"; "or";
    "quasiquote"; "quote"; "set!"; "pset!"; "unquote";
    "unquote-splicing"];;  
 
@@ -241,40 +241,63 @@ let rec tag_parse = function
   |Pair(Pair(symb, vl), ribs)->Pair (symb,get_params ribs)
   |_ -> raise X_syntax_error
 
-  and get_exp = function
-  |Nil->Nil
-  |Pair(Pair(symb ,Pair(vl, Nil)),ribs) ->Pair(vl,get_exp ribs)
+    (* opt lambda *)
+  and make_opt_lambda = function
+  |(Pair (l,r))->
+                  let tmp_args = (convert_to_list l) in 
+                  let args_with_last = (List.map remSym tmp_args) in 
+                  let last_arg =  (List.nth args_with_last ((List.length args_with_last) - 1)) in    (*we know its an improper list *)
+                  let args = (List.rev(List.tl  (List.rev args_with_last))) in
+                  let tmp_body = (convert_to_list r) in 
+                  let body =  (sequence tmp_body) in
+                  if body= Const(Void) || (check_dup args) then raise X_syntax_error
+                  else LambdaOpt (args, last_arg, body)
   |_ -> raise X_syntax_error
-  and kleene_let = function
-    |Pair(Nil,body)-> Pair(Symbol "let", Pair(Nil,body))
-    |Pair(Pair(Pair(sym,exp),Nil),body)-> Pair(Symbol "let",Pair(Pair(Pair(sym,exp),Nil),body))
-    |Pair(Pair(Pair(sym,exp),rest),body)->
-                                          let cont = Pair(rest, body)in
-                                          (Pair (Symbol "let",Pair(Pair(Pair(sym,exp),Nil),Pair(kleene_let cont,Nil))))
-    |_-> raise X_whyyyyyyyyy
-  and let_rec = function
-  |Pair (Nil, body)-> (Pair(Symbol ("let") ,Pair(Nil,body)))
-  |Pair(ribs,body) ->
-                        let args = make_rec_args ribs in
-                        let new_body=make_rec_exp ribs body in
-                        Pair(Symbol ("let") ,Pair(args,new_body))
-  | _ -> raise X_syntax_error
-  (* making the symbol expression *)
-  and make_rec_args ribs = 
-  match ribs with
-  |Nil ->Nil
-  |Pair(Pair (sym,vl),rest) ->Pair(Pair(sym,Pair(Pair(Symbol ("quote"),Pair(Symbol ("whatever"), Nil)),Nil)),(make_rec_args rest))
-  |_->raise X_syntax_error
-  (* making the set expression and the let body  *)
-  and make_rec_exp ribs body =
-  match ribs with
-  |Nil -> Pair(Pair(Symbol ("let") ,(Pair(Nil,body))),Nil)
-  |Pair(Pair (sym,Pair (vl,Nil)),rest) -> Pair(Pair(Symbol ("set!"), Pair(sym, Pair(vl,Nil))),(make_rec_exp rest body))
-  | _ -> raise X_syntax_error
+  (* quasiquote macro exception *)
+  
+ and expend_let = function
+ |Pair (Nil, body)  ->Applic (tag_parse (Pair(Symbol "lambda",Pair(Nil, body))),[])
+ |Pair (ribs,body)-> Applic (tag_parse (Pair (Symbol ("lambda"),Pair((get_params ribs), body))),(tag_parse_list_from_pair (get_exp ribs ))) 
+ |_->raise X_syntax_error
+
+ and get_params = function
+ |Nil->Nil
+ |Pair(Pair(symb, vl), ribs)->Pair (symb,get_params ribs)
+ |_ -> raise X_syntax_error
+
+ and get_exp = function
+ |Nil->Nil
+ |Pair(Pair(symb ,Pair(vl, Nil)),ribs) ->Pair(vl,get_exp ribs)
+ |_ -> raise X_syntax_error
+and kleene_let = function
+  |Pair(Nil,body)-> Pair(Symbol "let", Pair(Nil,body))
+  |Pair(Pair(Pair(sym,exp),Nil),body)-> Pair(Symbol "let",Pair(Pair(Pair(sym,exp),Nil),body))
+  |Pair(Pair(Pair(sym,exp),rest),body)->
+                                        let cont = Pair(rest, body)in
+                                        (Pair (Symbol "let",Pair(Pair(Pair(sym,exp),Nil),Pair(kleene_let cont,Nil))))
+  |_-> raise X_whyyyyyyyyy
+and let_rec = function
+|Pair (Nil, body)-> (Pair(Symbol ("let") ,Pair(Nil,body)))
+|Pair(ribs,body) ->
+                      let args = make_rec_args ribs in
+                      let new_body=make_rec_exp ribs body in
+                      Pair(Symbol ("let") ,Pair(args,new_body))
+| _ -> raise X_syntax_error
+(* making the symbol expression *)
+and make_rec_args ribs = 
+match ribs with
+|Nil ->Nil
+|Pair(Pair (sym,vl),rest) ->Pair(Pair(sym,Pair(Pair(Symbol ("quote"),Pair(Symbol ("whatever"), Nil)),Nil)),(make_rec_args rest))
+|_->raise X_syntax_error
+(* making the set expression and the let body  *)
+and make_rec_exp ribs body =
+match ribs with
+|Nil -> Pair(Pair(Symbol ("let") ,(Pair(Nil,body))),Nil)
+|Pair(Pair (sym,Pair (vl,Nil)),rest) -> Pair(Pair(Symbol ("set!"), Pair(sym, Pair(vl,Nil))),(make_rec_exp rest body))
+| _ -> raise X_syntax_error
 
 
-  ;;
-
+;;
 
 
 let tag_parse_expression sexpr = tag_parse sexpr;;
