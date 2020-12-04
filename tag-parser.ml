@@ -125,7 +125,7 @@ let rec tag_parse = function
   |Pair(Symbol "define", Pair(name, Pair(expr, Nil)))-> Def (tag_parse name, tag_parse expr)
   |Pair(Symbol "set!", Pair(x, Pair(exp, Nil)))-> Set(tag_parse x, tag_parse exp)
   |Pair(Symbol("quote"), Pair(x, Nil)) -> Const(Sexpr(x))
-  |Pair(Symbol "begin",explist)-> Seq(sequnce_complete (convert_to_list explist))
+  |Pair(Symbol "begin",explist)-> sequnce_complete (convert_to_list explist)
   |Pair(Symbol ("quasiquote"), Pair (x , Nil)) -> tag_parse (evallll (x))
   |Pair(Symbol("let"), x) -> expend_let x
   |Pair(Symbol "let*" ,x)->  tag_parse (kleene_let x)
@@ -196,7 +196,12 @@ match x with
     | Seq(x) :: tail -> List.append x (sequence_flat tail)
     | hd::tl -> List.append [hd] (sequence_flat tl) 
     
-  and sequnce_complete body= sequence_flat (tmp_sequence body)
+  and sequnce_complete body= 
+        let tmp_seq = sequence_flat (tmp_sequence body) in
+        match(List.length tmp_seq) with
+        |0 -> Const(Void)
+        |1 ->(List.nth tmp_seq 0)
+        |_ ->Seq (tmp_seq)         
       (* check for duplicate in the are list  *)
   and check_dup args =
       match args with 
