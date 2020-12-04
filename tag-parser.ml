@@ -107,7 +107,14 @@ let  cond_exp_first cond=
 
 
 
-
+  let rec and_parse_rec expr= 
+    match expr with 
+    |Nil->(Bool true)
+    |Pair(expr1,Nil)->expr1
+    |Pair(first,rest)->  Pair(Symbol("if"), Pair(first, Pair((and_parse_rec rest), Pair((Bool false), Nil)))) 
+    |_->raise X_syntax_error;;
+  
+  
 
 
 
@@ -137,6 +144,7 @@ let rec tag_parse = function
   |Pair(Symbol "let*" ,x)->  tag_parse (kleene_let x)
   |Pair(Symbol("letrec"),x)->  tag_parse (let_rec x)
   |Pair(Symbol "cond",body)->tag_parse (cond_exp_first body)
+  |Pair(Symbol "and",body)->tag_parse (and_parse_rec body)
 
                 (* VVVV should be last I think or change the error to compute it if it is a reserved word - Raviv*)
   |Pair(function_applic,arg_list) ->
