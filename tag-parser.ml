@@ -59,7 +59,9 @@ let reserved_word_list =
 
 (* work on the tag parser starts here *)
 
-(* cond *)
+
+
+(* condVV *)
 let cond_rib_seq body = Pair(Symbol ("begin"),body);;
 let cond_rib1 expr body rest = 
   match rest with  
@@ -104,7 +106,6 @@ let  cond_exp_first cond=
 
 
 
-  
 
 
 
@@ -125,7 +126,7 @@ let rec tag_parse = function
   |Pair(Symbol "define", Pair(name, Pair(expr, Nil)))-> Def (tag_parse name, tag_parse expr)
   |Pair(Symbol "set!", Pair(x, Pair(exp, Nil)))-> Set(tag_parse x, tag_parse exp)
   |Pair(Symbol("quote"), Pair(x, Nil)) -> Const(Sexpr(x))
-  |Pair(Symbol "begin",explist)-> Seq(sequnce_complete (convert_to_list explist))
+  |Pair(Symbol "begin",explist)-> sequnce_complete (convert_to_list explist)
   |Pair(Symbol ("quasiquote"), Pair (x , Nil)) -> tag_parse (evallll (x))
   |Pair(Symbol("let"), x) -> expend_let x
   |Pair(Symbol "let*" ,x)->  tag_parse (kleene_let x)
@@ -147,100 +148,81 @@ let rec tag_parse = function
 
 
 
-  and evallll x =
-  match x with 
-    |Nil -> Nil 
-    |Pair(Symbol ("unquote"), Pair(a, Nil))-> a 
-    |Pair(Symbol ("unquote-splicing"), Pair(a, Nil))-> a
-    |Pair(Pair(Symbol ("unquote"), Pair(l, Nil)), b)-> Pair(Symbol ("cons"),Pair (l, Pair( (evallll b),Nil)))  
-    |Pair(Pair(Symbol ("unquote"), a), b)-> Pair(Symbol "cons",Pair (a, Pair( (evallll b),Nil)))
-    |Pair(Pair(Symbol ("unquote-splicing") , Pair(s, Nil)), b) -> Pair(Symbol ("append"),Pair( s,Pair( (evallll b), Nil)))  
-    |Pair(Pair(Symbol ("unquote-splicing") ,s), b)-> Pair(Symbol "append",Pair( s,Pair( (evallll b), Nil)))
-    |Pair(Pair(a, b),c) ->  Pair(Symbol "cons", Pair(Pair (Symbol "cons", Pair(evallll a, Pair(evallll b , Nil))), Pair((evallll c), Nil)))
-    |Pair(not_unquote, b) ->  Pair(Symbol "cons", Pair(Pair (Symbol "quote", Pair( not_unquote, Nil)), Pair((evallll b),Nil))) 
-    |quot-> (Pair (Symbol "quote", Pair( quot, Nil)))
+and evallll x =
+match x with 
+  |Nil -> Nil 
+  |Pair(Symbol ("unquote"), Pair(a, Nil))-> a 
+  |Pair(Symbol ("unquote-splicing"), Pair(a, Nil))-> a
+  |Pair(Pair(Symbol ("unquote"), Pair(l, Nil)), b)-> Pair(Symbol ("cons"),Pair (l, Pair( (evallll b),Nil)))  
+  |Pair(Pair(Symbol ("unquote"), a), b)-> Pair(Symbol "cons",Pair (a, Pair( (evallll b),Nil)))
+  |Pair(Pair(Symbol ("unquote-splicing") , Pair(s, Nil)), b) -> Pair(Symbol ("append"),Pair( s,Pair( (evallll b), Nil)))  
+  |Pair(Pair(Symbol ("unquote-splicing") ,s), b)-> Pair(Symbol "append",Pair( s,Pair( (evallll b), Nil)))
+  |Pair(Pair(a, b),c) ->  Pair(Symbol "cons", Pair(Pair (Symbol "cons", Pair(evallll a, Pair(evallll b , Nil))), Pair((evallll c), Nil)))
+  |Pair(not_unquote, b) ->  Pair(Symbol "cons", Pair(Pair (Symbol "quote", Pair( not_unquote, Nil)), Pair((evallll b),Nil))) 
+  |quot-> (Pair (Symbol "quote", Pair( quot, Nil)))
 
-    and tag_parse_list_from_pair x= 
-                  let lst =convert_to_list x in
-                  List.map (fun a-> (tag_parse a)) lst 
-                          
-    and proper_list = function                    (*check the list for the lambda*)
-      |Nil -> true 
-      |Pair (l,r) -> proper_list(r)
-      |_ ->false
-      
-    and convert_to_list =function
-    | Pair(l,r)-> l :: (convert_to_list r)
-    | Nil -> []
-    | l -> [l]
-
-    and parsing_lambda  = function 
-    |(Pair (arglist,exp))->
-                  if (proper_list arglist) then (make_simple_lambda (Pair (arglist,exp))) 
-                  else (make_opt_lambda(Pair (arglist,exp)))
-    |_ -> raise X_syntax_error
-          (* parsing the sequence *)
-    and sequence tmp_body= 
-        match (List.length tmp_body) with 
-        |0-> Const(Void)
-        |1 ->  tag_parse (List.hd tmp_body)
-        |_ ->  Seq (List.map (fun a-> (tag_parse a)) tmp_body)
-
-    and  tmp_sequence tmp_body= 
-    match (List.length tmp_body) with 
-    |0-> [Const(Void)]
-    |1 ->  [tag_parse (List.hd tmp_body)]
-    |_ ->   (List.map (fun a-> (tag_parse a)) tmp_body)  
-    and sequence_flat =function 
-      | []-> []
-      | Seq(x) :: tail -> List.append x (sequence_flat tail)
-      | hd::tl -> List.append [hd] (sequence_flat tl) 
-      
-    and sequnce_complete body= sequence_flat (tmp_sequence body)
-        (* check for duplicate in the are list  *)
-    and check_dup args =
-        match args with 
-        |[] -> false
-        | head::tail -> List.exists (fun(element)->element = head) tail || check_dup tail
-          (* geting the value of symbol *)
-    and remSym sym= 
-          match sym with 
-                  | Symbol(a)-> a
-                  | _->raise X_syntax_error
-      (* simple lambda *)
-    and make_simple_lambda = function
-    |(Pair (l,r))->
-                    let tmp_args = (convert_to_list l) in 
-                    let args = (List.map remSym tmp_args) in 
-                    let tmp_body = (convert_to_list r) in 
-                    let body =  (sequence tmp_body) in 
-                    if body= Const(Void) || (check_dup args) then raise X_syntax_error
-                    else LambdaSimple (args, body)
-    |_ -> raise X_syntax_error
-      (* opt lambda *)
-    and make_opt_lambda = function
-    |(Pair (l,r))->
-                    let tmp_args = (convert_to_list l) in 
-                    let args_with_last = (List.map remSym tmp_args) in 
-                    let last_arg =  (List.nth args_with_last ((List.length args_with_last) - 1)) in    (*we know its an improper list *)
-                    let args = (List.rev(List.tl  (List.rev args_with_last))) in
-                    let tmp_body = (convert_to_list r) in 
-                    let body =  (sequence tmp_body) in
-                    if body= Const(Void) || (check_dup args) then raise X_syntax_error
-                    else LambdaOpt (args, last_arg, body)
-    |_ -> raise X_syntax_error
-    (* quasiquote macro exception *)
+  and tag_parse_list_from_pair x= 
+                let lst =convert_to_list x in
+                List.map (fun a-> (tag_parse a)) lst 
+                        
+  and proper_list = function                    (*check the list for the lambda*)
+    |Nil -> true 
+    |Pair (l,r) -> proper_list(r)
+    |_ ->false
     
-  and expend_let = function
-  |Pair (Nil, body)  ->Applic (tag_parse (Pair(Symbol "lambda",Pair(Nil, body))),[])
-  |Pair (ribs,body)-> Applic (tag_parse (Pair (Symbol ("lambda"),Pair((get_params ribs), body))),(tag_parse_list_from_pair (get_exp ribs ))) 
-  |_->raise X_whyyyyyyyyy
+  and convert_to_list =function
+  | Pair(l,r)-> l :: (convert_to_list r)
+  | Nil -> []
+  | l -> [l]
 
-  and get_params = function
-  |Nil->Nil
-  |Pair(Pair(symb, vl), ribs)->Pair (symb,get_params ribs)
+  and parsing_lambda  = function 
+  |(Pair (arglist,exp))->
+                if (proper_list arglist) then (make_simple_lambda (Pair (arglist,exp))) 
+                else (make_opt_lambda(Pair (arglist,exp)))
   |_ -> raise X_syntax_error
+        (* parsing the sequence *)
+  and sequence tmp_body= 
+      match (List.length tmp_body) with 
+      |0-> Const(Void)
+      |1 ->  tag_parse (List.hd tmp_body)
+      |_ ->  Seq (List.map (fun a-> (tag_parse a)) tmp_body)
 
+   and  tmp_sequence tmp_body= 
+   match (List.length tmp_body) with 
+   |0-> [Const(Void)]
+   |1 ->  [tag_parse (List.hd tmp_body)]
+   |_ ->   (List.map (fun a-> (tag_parse a)) tmp_body)  
+  and sequence_flat =function 
+    | []-> []
+    | Seq(x) :: tail -> List.append x (sequence_flat tail)
+    | hd::tl -> List.append [hd] (sequence_flat tl) 
+    
+  and sequnce_complete body= 
+        let tmp_seq = sequence_flat (tmp_sequence body) in
+        match(List.length tmp_seq) with
+        |0 -> Const(Void)
+        |1 ->(List.nth tmp_seq 0)
+        |_ ->Seq (tmp_seq)         
+      (* check for duplicate in the are list  *)
+  and check_dup args =
+      match args with 
+      |[] -> false
+      | head::tail -> List.exists (fun(element)->element = head) tail || check_dup tail
+        (* geting the value of symbol *)
+  and remSym sym= 
+        match sym with 
+                 | Symbol(a)-> a
+                 | _->raise X_syntax_error
+    (* simple lambda *)
+  and make_simple_lambda = function
+  |(Pair (l,r))->
+                  let tmp_args = (convert_to_list l) in 
+                  let args = (List.map remSym tmp_args) in 
+                  let tmp_body = (convert_to_list r) in 
+                  let body =  (sequence tmp_body) in 
+                  if body= Const(Void) || (check_dup args) then raise X_syntax_error
+                  else LambdaSimple (args, body)
+  |_ -> raise X_syntax_error
     (* opt lambda *)
   and make_opt_lambda = function
   |(Pair (l,r))->
@@ -304,44 +286,6 @@ let tag_parse_expression sexpr = tag_parse sexpr;;
 let tag_parse_expressions sexpr = List.map tag_parse sexpr;;
 end;; (* struct Tag_Parser *)
 
-(* condVV *)
-  let cond_rib_seq body = Pair(Symbol ("begin"),body);;
-  let cond_rib1 expr body rest = 
-    match rest with  
-    |Nil ->Pair(Symbol "if",Pair(expr,Pair((cond_rib_seq body),Nil)))
-    |_ ->  Pair(Symbol "if",Pair(expr,Pair((cond_rib_seq body), Pair(rest , Nil))));;
 
 
-  let cond_rib2 expr expr_f rest = 
-    match rest with 
-    |Nil ->Pair(Symbol "let", Pair(Pair(Pair(Symbol "value", Pair(expr, Nil)), Pair(Pair(Symbol "f", Pair(Pair(Symbol "lambda", Pair(Nil, Pair(expr_f, Nil))), Nil)), Nil)), Pair(Pair(Symbol "if", Pair(Symbol "value", Pair(Pair(Pair(Symbol "f", Nil), Pair(Symbol "value", Nil)), Nil))), Nil)))
-    |_ ->  Pair(Symbol "let", Pair(Pair(Pair(Symbol "value", Pair(expr, Nil)), Pair(Pair(Symbol "f", Pair(Pair(Symbol "lambda", Pair(Nil, Pair(expr_f, Nil))), Nil)), Pair(Pair(Symbol "rest", Pair(Pair(Symbol "lambda", Pair(Nil, Pair(rest, Nil))), Nil)), Nil))), Pair(Pair(Symbol "if", Pair(Symbol "value", Pair(Pair(Pair(Symbol "f", Nil), Pair(Symbol "value", Nil)), Pair(Pair(Symbol "rest", Nil), Nil)))), Nil)));;
-  let get_rib_1_or_2 rib rest = 
-    match rib with
-      |Pair(expr,Pair(Symbol "=>",Pair(foo,Nil)))-> (cond_rib2 expr foo rest)
-      |Pair(expr,body)->(cond_rib1 expr body rest)
-      |_ -> raise X_whyyyyyyyyy;;
-
-      
-  let rec cond_exp_rec cond= 
-    match cond with
-    |Pair(first,Nil) -> (cond_last_one first)
-    | Pair(first,rest) -> (get_rib_1_or_2 first (cond_exp_rec rest))
-    |_-> raise X_syntax_error
-
-  and cond_last_one last_one= 
-    match last_one with
-    | Pair(Symbol "else", rib) -> (cond_rib_seq rib)
-    | _-> (get_rib_1_or_2 last_one Nil);;
-
-  let cond_last_one_no_else last_one= 
-    match last_one with 
-    | Pair(Symbol "else", _)->raise X_syntax_error
-    | _-> (get_rib_1_or_2 last_one Nil)
-
-
-  let  cond_exp_first cond= 
-    match cond with
-    |Pair(first,Nil) -> (cond_last_one_no_else first)
-    |Pair(first,rest)-> (cond_exp_rec (Pair(first,rest)))
-    |_-> raise X_syntax_error;;
+  
