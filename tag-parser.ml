@@ -82,8 +82,8 @@ let get_rib_1_or_2 rib rest =
     
 let rec cond_exp_rec cond= 
   match cond with
-  | Pair(Symbol "else", rib) -> (cond_rib_seq rib)
   |Pair(first,Nil) -> (cond_last_one first)
+  |Pair(Pair(Symbol "else", rib),rest) -> (cond_rib_seq rib)
   | Pair(first,rest) -> (get_rib_1_or_2 first (cond_exp_rec rest))
 
   |_-> raise X_syntax_error
@@ -124,7 +124,10 @@ let rec tag_parse = function
   |Pair(Symbol("if"), Pair(test, Pair(dit, Pair(dif, Nil)))) -> If(tag_parse test, tag_parse dit, tag_parse dif)  (* if test dit dif *)
   |Pair(Symbol("if"), Pair(test, Pair(dit, Nil))) -> If(tag_parse test, tag_parse dit, Const(Void))              (* if test then *)
   |Pair(Symbol ("lambda"),x) -> parsing_lambda x
+  |Pair(Symbol("or"), Nil)->(Const (Sexpr (Bool false)))
+  |Pair(Symbol("or"), Pair(x,Nil))-> tag_parse x
   |Pair(Symbol ("or"), expr_list) -> Or (tag_parse_list_from_pair expr_list)
+  |Pair(Symbol("define"),Pair(Pair(Symbol sym,params),body)) -> tag_parse (Pair(Symbol("define"),Pair(Symbol(sym),Pair(Pair(Symbol("lambda"),Pair(params,body)),Nil))) )
   |Pair(Symbol "define", Pair(name, Pair(expr, Nil)))-> Def (tag_parse name, tag_parse expr)
   |Pair(Symbol "set!", Pair(x, Pair(exp, Nil)))-> Set(tag_parse x, tag_parse exp)
   |Pair(Symbol("quote"), Pair(x, Nil)) -> Const(Sexpr(x))
