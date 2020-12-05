@@ -43,6 +43,7 @@ let rec expr_eq e1 e2 =
 	
                        
 exception X_syntax_error;;
+exception X_no_args_pset;;
 exception X_whyyyyyyyyy;;
 
 module type TAG_PARSER = sig
@@ -114,7 +115,7 @@ let  cond_exp_first cond=
     |Pair(first,rest)->  Pair(Symbol("if"), Pair(first, Pair((and_parse_rec rest), Pair((Bool false), Nil)))) 
     |_->raise X_syntax_error;;
   
-  
+      
 
 
 
@@ -145,6 +146,7 @@ let rec tag_parse = function
   |Pair(Symbol("letrec"),x)->  tag_parse (let_rec x)
   |Pair(Symbol "cond",body)->tag_parse (cond_exp_first body)
   |Pair(Symbol "and",body)->tag_parse (and_parse_rec body)
+  |Pair(Symbol "pset!",body)->tag_parse (you_had_one_job body)
 
                 (* VVVV should be last I think or change the error to compute it if it is a reserved word - Raviv*)
   |Pair(function_applic,arg_list) ->
@@ -249,6 +251,10 @@ match x with
                   else LambdaOpt (args, last_arg, body)
   |_ -> raise X_syntax_error
   (* quasiquote macro exception *)
+
+  and you_had_one_job =function 
+  |Nil-> raise X_no_args_pset
+  |body->Pair(Symbol "let",Pair(body,Pair(Pair(Symbol("if"), Pair(Bool false , Pair(String("we are too good"), Nil))),Nil)))
   
  and expend_let = function
  |Pair (Nil, body)  ->Applic (tag_parse (Pair(Symbol "lambda",Pair(Nil, body))),[])
@@ -266,7 +272,7 @@ match x with
  |_ -> raise X_syntax_error
 and kleene_let = function
   |Pair(Nil,body)-> Pair(Symbol "let", Pair(Nil,body))
-  |Pair(Pair(Pair(sym,exp),Nil),body)-> Pair(Symbol "let",Pair(Pair(Pair(sym,exp),Nil),body))
+  |Pair(Pair(Pair(sym,exp),Nil),body)-> Pair(Symbol  "let",Pair(Pair(Pair(sym,exp),Nil),body))
   |Pair(Pair(Pair(sym,exp),rest),body)->
                                         let cont = Pair(rest, body)in
                                         (Pair (Symbol "let",Pair(Pair(Pair(sym,exp),Nil),Pair(kleene_let cont,Nil))))
@@ -293,8 +299,6 @@ match ribs with
 
 
 ;;
-
-
 let tag_parse_expression sexpr = tag_parse sexpr;;
 let tag_parse_expressions sexpr = List.map tag_parse sexpr;;
 end;; (* struct Tag_Parser *)
@@ -344,3 +348,4 @@ let  cond_exp_first cond=
   |Pair(first,Nil) -> (cond_last_one_no_else first)
   |Pair(first,rest)-> (cond_exp_rec (Pair(first,rest)))
   |_-> raise X_syntax_error;;
+
