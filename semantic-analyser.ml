@@ -69,40 +69,54 @@ end;;
 
 module Semantics : SEMANTICS = struct
 
-let rec containts_symbol lst symbol index =
+let rec contains_symbol lst symbol index =
 match lst with 
-   |[]->-1
-   |Symbol(symbol)::_->index
-   |hd::tl->(containts_symbol tl symbol (index+1))
-   |_->-1;;
+   |[]->(-1)
+   |Var(symbol)::_->index
+   |hd::tl->(contains_symbol tl symbol (index+1))
+   |_->(-1)
 
 
-let rec index_of_list_containts_symbol lst symbol index =
-match lst with 
-    |[]->-1
-    |Symbol(symbol)::_->index
-    |hd::tl->(containts_symbol tl symbol (index+1))
-    |_->-1;;
+  and index_of_list_contains_symbol lst symbol index =
+  match lst with 
+      |[]->(-1)
+      |hd::tl->(if((contains_symbol hd symbol 0)>(-1)) then index else (index_of_list_contains_symbol tl symbol index+1))
+      |_->(-1)
+  and index_of_item_in_list_contains_symbol lst symbol =
+  match lst with 
+  |[]->(-1)
+  |hd::tl-> let index_in_lst=(contains_symbol hd symbol 0) in 
+            (if (index_in_lst>(-1)) then index_in_lst else(index_of_item_in_list_contains_symbol tl symbol))
+  |_->(-1);;
 
+ 
 let get_var name params_list env_list=
-  if(containts_symbol params_list name 0)
-    Var'(name,)
-
-let rec annotate_lexical_addresses_recursive expr params_list env_list= match exper with 
-|Const(x)->Const'(x)
-| Var(name)->(get_var name params_list env_list
-| If (test,dit,dif)
-| Seq of expr list
-| Set of expr * expr
-| Def of expr * expr
-| Or of expr list
-| LambdaSimple of string list * expr
+  let index_in_params=(contains_symbol params_list name 0) in
+    if(index_in_params>(-1))
+    then Var'(VarParam(name ,index_in_params))
+    else let index_of_list_in_env=(index_of_list_contains_symbol env_list name 0) in
+              (if (index_of_list_in_env>(-1))
+              then Var'(VarBound(name,index_of_list_in_env,(index_of_item_in_list_contains_symbol env_list name)))
+              else Var'(VarFree(name)));;
+let rec annotate_lexical_addresses_recursive expr params_list env_list= match expr with 
+| Const(x)->Const'(x)
+| Var(name)->(get_var name params_list env_list)
+| If (test,dit,dif)-> If' ((annotate_lexical_addresses_recursive test params_list env_list),(annotate_lexical_addresses_recursive dit params_list env_list),(annotate_lexical_addresses_recursive dif params_list env_list))
+| Seq (lst) ->Seq'( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst)
+| Set (vari,expr) -> Set' ((match (annotate_lexical_addresses_recursive vari params_list env_list) with
+                          |Var'(x) -> x
+                          |_-> raise X_syntax_error) ,(annotate_lexical_addresses_recursive expr params_list env_list ))
+| Def (var1,val1) -> Def' ((match (annotate_lexical_addresses_recursive var1 params_list env_list) with
+                          |Var'(x) -> x
+                          |_-> raise X_syntax_error),(annotate_lexical_addresses_recursive val1 params_list env_list ))
+| Or (lst) -> Or' ( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst)
+(*| LambdaSimple of string list * expr
 | LambdaOpt of string list * string * expr
-| Applic of expr * (expr list)
-|_-> raise X_syntax_error;;
+| Applic (func,lst) -> Applic' ((annotate_lexical_addresses_recursive func params_list env_list ), ( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst))
+|_-> raise X_syntax_error *)
 ;;
 let annotate_lexical_addresses e =
-  (annotate_lexical_addresses_recursive e)
+  (annotate_lexical_addresses_recursive e [] [])
 ;;
 
 let annotate_tail_calls e = raise X_not_yet_implemented;;
