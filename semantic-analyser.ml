@@ -71,14 +71,22 @@ module Semantics : SEMANTICS = struct
 
 let rec containts_symbol lst symbol index =
 match lst with 
-   |[]->-1 
-   |Symbol(symbol)::_->in
-   hd::tl->containts_symbol tl symbol (index+1)
-   |_->false;;
+   |[]->-1
+   |Symbol(symbol)::_->index
+   |hd::tl->(containts_symbol tl symbol (index+1))
+   |_->-1;;
+
+
+let rec index_of_list_containts_symbol lst symbol index =
+match lst with 
+    |[]->-1
+    |Symbol(symbol)::_->index
+    |hd::tl->(containts_symbol tl symbol (index+1))
+    |_->-1;;
 
 let get_var name params_list env_list=
   if(containts_symbol params_list name 0)
-    Var'()
+    Var'(name,)
 
 let rec annotate_lexical_addresses_recursive expr params_list env_list= match exper with 
 |Const(x)->Const'(x)
