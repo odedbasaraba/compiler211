@@ -110,15 +110,44 @@ let rec annotate_lexical_addresses_recursive expr params_list env_list= match ex
                           |Var'(x) -> x
                           |_-> raise X_syntax_error),(annotate_lexical_addresses_recursive val1 params_list env_list ))
 | Or (lst) -> Or' ( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst)
-(*| LambdaSimple of string list * expr
-| LambdaOpt of string list * string * expr
+| LambdaSimple (params,body)-> 
+                              let new_env = params::env_list in
+                              let param_lst = params in
+                              let new_body = (annotate_lexical_addresses_recursive body param_lst new_env)in
+                              LambdaSimple' (params,new_body)
+(*| | LambdaOpt of string list * string * expr
 | Applic (func,lst) -> Applic' ((annotate_lexical_addresses_recursive func params_list env_list ), ( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst))
-|_-> raise X_syntax_error *)
+*)|_-> raise X_syntax_error 
 ;;
 let annotate_lexical_addresses e =
   (annotate_lexical_addresses_recursive e [] [])
 ;;
+(*\\\\\\\\\\\\\\\\\\\\\\\tail-calls/////////////////////////////// *)
+let rec tail_call exp =
+  match exp with 
+  | LambdaSimple'(x,Seq'(body))->LambdaSimple'(x,Seq'(make_TP_last_element body))
+  | LambdaSimple'(x,body) -> LambdaSimple'(x,make_TP body)
+  | LambdaOpt'(x,y,Seq'(body))-> LambdaOpt' (x,y,Seq'(make_TP_last_element body))
+  | LambdaOpt'(x,y,body) -> LambdaOpt' (x,y,make_TP body)
+  | If'(test, dit, dif)-> If'((tail_call test),(tail_call dit),(tail_call dif))
+  | Or'(lst)-> Or'(List.map (fun x->(tail_call x))lst)
+  | Seq'(lst) -> Seq' (List.map (fun x->(tail_call x))lst)
+  | Set'(vari,exp) -> Set' (vari, (tail_call exp)) (*check if needed*)
+  | Def'(vari,exp) -> Def' (vari, (tail_call exp))
+  | Applic'(proc,lst) -> Applic'((tail_call proc),(List.map (fun x -> (tail_call x))lst))
+  | x -> x
 
+and make_TP = function
+|If'(test,dif,dit) -> If'((tail_call test),(make_TP (tail_call dif)),(make_TP (tail_call dit)))
+|Or' (lst) -> Or'(make_TP_last_element lst)
+|Applic'(proc,lst) -> ApplicTP' ((tail_call proc),(List.map tail_call lst))
+|x -> tail_call x
+
+and make_TP_last_element lst =
+  let after_tail_lst = (List.map (fun x -> (tail_call x))) lst in
+  let tail = List.hd (List.rev after_tail_lst) in
+  List.rev_append (List.tl(List.rev after_tail_lst)) [(make_TP tail)] ;;
+(*\\\\\\\\\\\\\\\\\\\\\\\tail-calls/////////////////////////////// *)
 let annotate_tail_calls e = raise X_not_yet_implemented;;
 
 let box_set e = raise X_not_yet_implemented;;
