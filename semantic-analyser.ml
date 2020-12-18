@@ -72,15 +72,14 @@ module Semantics : SEMANTICS = struct
 let rec contains_symbol lst symbol index =
 match lst with 
    |[]->(-1)
-   |Var(symbol)::_->index
-   |hd::tl->(contains_symbol tl symbol (index+1))
+   |hd::tl->(if ((compare hd symbol)==0) then index else (contains_symbol tl symbol (index+1)))
    |_->(-1)
 
 
   and index_of_list_contains_symbol lst symbol index =
   match lst with 
       |[]->(-1)
-      |hd::tl->(if((contains_symbol hd symbol 0)>(-1)) then index else (index_of_list_contains_symbol tl symbol index+1))
+      |hd::tl->(if((contains_symbol hd symbol 0)>(-1)) then index else (index_of_list_contains_symbol tl symbol (index+1)))
       |_->(-1)
   and index_of_item_in_list_contains_symbol lst symbol =
   match lst with 
@@ -111,13 +110,17 @@ let rec annotate_lexical_addresses_recursive expr params_list env_list= match ex
                           |_-> raise X_syntax_error),(annotate_lexical_addresses_recursive val1 params_list env_list ))
 | Or (lst) -> Or' ( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst)
 | LambdaSimple (params,body)-> 
-                              let new_env = params::env_list in
+                              let new_env = params_list::env_list in
                               let param_lst = params in
                               let new_body = (annotate_lexical_addresses_recursive body param_lst new_env)in
                               LambdaSimple' (params,new_body)
-(*| | LambdaOpt of string list * string * expr
+|LambdaOpt (params,optinalParam,body)->
+                                      let new_env = params_list::env_list in
+                                      let param_lst = (List.append params [optinalParam]) in
+                                      let new_body = (annotate_lexical_addresses_recursive body param_lst new_env)in
+                                      LambdaOpt' (params,optinalParam,new_body)
 | Applic (func,lst) -> Applic' ((annotate_lexical_addresses_recursive func params_list env_list ), ( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst))
-*)|_-> raise X_syntax_error 
+|_-> raise X_syntax_error 
 ;;
 let annotate_lexical_addresses e =
   (annotate_lexical_addresses_recursive e [] [])
@@ -131,7 +134,7 @@ let rec tail_call exp =
   | LambdaOpt'(x,y,body) -> LambdaOpt' (x,y,make_TP body)
   | If'(test, dit, dif)-> If'((tail_call test),(tail_call dit),(tail_call dif))
   | Or'(lst)-> Or'(List.map (fun x->(tail_call x))lst)
-  | Seq'(lst) -> Seq' (List.map (fun x->(tail_call x))lst)
+  | Seq'(lst) -> Seq' (make_TP_last_element lst)
   | Set'(vari,exp) -> Set' (vari, (tail_call exp)) (*check if needed*)
   | Def'(vari,exp) -> Def' (vari, (tail_call exp))
   | Applic'(proc,lst) -> Applic'((tail_call proc),(List.map (fun x -> (tail_call x))lst))
@@ -148,14 +151,13 @@ and make_TP_last_element lst =
   let tail = List.hd (List.rev after_tail_lst) in
   List.rev_append (List.tl(List.rev after_tail_lst)) [(make_TP tail)] ;;
 (*\\\\\\\\\\\\\\\\\\\\\\\tail-calls/////////////////////////////// *)
-let annotate_tail_calls e = raise X_not_yet_implemented;;
+let annotate_tail_calls e = (tail_call e);;
 
 let box_set e = raise X_not_yet_implemented;;
 
 let run_semantics expr =
-  box_set
-    (annotate_tail_calls
-       (annotate_lexical_addresses expr));;
+  annotate_tail_calls
+       (annotate_lexical_addresses expr);;
   
 end;; (* struct Semantics *)
 
