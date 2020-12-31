@@ -74,6 +74,27 @@
 	mov byte [%1+TYPE_SIZE], %2
 %endmacro
 
+%macro MAKE_LITERAL 2 ; Make a literal of type %1; followed by the size and def %2
+	db %1
+	%2
+%endmacro
+
+%define MAKE_LITERAL_INT(val) MAKE_LITERAL T_RATIONAL, dq val
+%define MAKE_LITERAL_CHAR(val) MAKE_LITERAL T_CHAR, db val
+%define MAKE_NIL db T_NIL
+%define MAKE_VOID db T_VOID
+%define MAKE_BOOL(val) MAKE_LITERAL T_BOOL, db val
+%define MAKE_LITERAL_SYMBOL(val) MAKE_LITERAL T_SYMBOL, dq val
+
+%macro MAKE_LITERAL_STRING 1
+	db T_STRING
+	dq (%%end_str - %%str)
+	%%str:
+	db %1
+	%%end_str:
+%endmacro
+
+
 ; Creates a long SOB with the
 ; value %2 and type %3.
 ; Returns the result in register %1
@@ -85,6 +106,9 @@
 
 %define MAKE_FLOAT(r,val) MAKE_LONG_VALUE r, val, T_FLOAT
 %define MAKE_CHAR(r,val) MAKE_CHAR_VALUE r, val
+%define MAKE_BOOL(val) MAKE_BOOL_VALUE  val
+
+
 
 ; Create a string of length %2
 ; from char %3.
@@ -117,6 +141,7 @@
         mov qword [%1+TYPE_SIZE], %3
         mov qword [%1+TYPE_SIZE+WORD_SIZE], %4
 %endmacro
+
 
 %macro MAKE_WORDS_LIT 3
 	db %1

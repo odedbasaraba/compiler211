@@ -33,80 +33,86 @@ end;;
 module Code_Gen : CODE_GEN = struct
   let get_offset const_tbl_and_ofsset=
     match const_tbl_and_ofsset with 
-    |_:num -> num
+    |(_,num) -> num
     |_-> raise X_this_should_not_happen;;
 
-    
+
   let get_const_tbl const_tbl_and_ofsset=
     match const_tbl_and_ofsset with 
-    |const_tbl:_ ->const_tbl
+    |(const_tbl,_) ->const_tbl
+    
     |_-> raise X_this_should_not_happen;;
 
-
+  let add_to_const_table const tbl offset assembly_expression size = 
+    ((List.append tbl ([(const, (offset, assembly_expression))])),[(offset+size)])
+    
   let rec eval_const ast const_tbl_and_ofsset= 
     let offset=get_offset const_tbl_and_ofsset in
     let const_tbl= get_const_tbl const_tbl_and_ofsset in 
       match ast with
       | If'(test,dit,dif) -> 
-        let const_tbl = (eval_const test const_tbl) in
-        let const_tbl = (eval_const dit const_tbl) in
-            (eval_const dif const_tbl) 
-      | LambdaSimple'(args,body) -> (eval_const body const_tbl)
-      | LambdaOpt'(args,arg,body) -> (eval_const body const_tbl)
+        let new_const_tbl_and_ofsset= (eval_const test new_const_tbl_and_ofsset) in
+        let new_const_tbl_and_ofsset= (eval_const dit new_const_tbl_and_ofsset) in
+          (eval_const dif new_const_tbl_and_ofsset)
+      | LambdaSimple'(args,body) -> (eval_const body const_tbl_and_ofsset)
+      | LambdaOpt'(args,arg,body) -> (eval_const body const_tbl_and_ofsset)
       | Set' (y, z)-> 
-        let const_tbl = (eval_const y const_tbl) in
-        (eval_const z const_tbl) 
-      | Or' (args) -> (List.fold_left (fun acc curr-> (eval_const curr acc))  const_tbl args)
+        let const_tbl = (eval_const y const_tbl_and_ofsset) in
+        (eval_const z const_tbl_and_ofsset) 
+      | Or' (args) -> (List.fold_left (fun acc curr-> (eval_const curr acc))  const_tbl_and_ofsset args)
       | Def' (variable,y) ->
-        let const_tbl = (eval_const variable const_tbl) in
-        (eval_const y const_tbl) 
+        let new_const_tbl_and_ofsset= (eval_const variable const_tbl_and_ofsset) in
+        (eval_const y new_const_tbl_and_ofsset) 
       | Applic' (op,args)-> 
-        let const_tbl= (List.fold_left (fun acc curr-> (eval_const curr acc))  const_tbl args) in
-        (eval_const op const_tbl)
+        let new_const_tbl_and_ofsset= (List.fold_left (fun acc curr-> (eval_const curr acc))  const_tbl_and_ofsset args) in
+        (eval_const op new_const_tbl_and_ofsset)
       | ApplicTP' (op,args) ->
-        let const_tbl= (List.fold_left (fun acc curr-> (eval_const curr acc))  const_tbl args) in
-        (eval_const op const_tbl)
-      | Seq' (body)-> (List.fold_left (fun acc curr-> (eval_const curr acc))  const_tbl body)
-      | BoxSet'(var,exp)-> (eval_const exp const_tbl)
+        let new_const_tbl_and_ofsset= (List.fold_left (fun acc curr-> (eval_const curr acc))  const_tbl_and_ofsset args) in
+        (eval_const op new_const_tbl_and_ofsset)
+      | Seq' (body)-> (List.fold_left (fun acc curr-> (eval_const curr acc))  const_tbl_and_ofsset body)
+      | BoxSet'(var,exp)-> (eval_const exp const_tbl_and_ofsset)
       | Const'(const)-> 
-        const_Handler const const_tbl 
-      | exp -> const_tbl
+        const_Handler const const_tbl offset 
+      | exp -> const_tbl_and_ofsset
 
-  and cnst_founder var tbl =
-  (List.find (fun curr-> 
-            let ((type_,(addr,_)),_) = curr in
-            var=type_)
-    const_table)
+  and find_const_addr var tbl =
+  match tbl with 
+  |[(v, (addr,_))::tl -> if(sexpr_eq var v) then addr else (find_const_addr var tl) 
+  |[]-> -1
 
-  and const_Handler const tbl=
-  let address_at_const_table= (find_const const table) in  
-+  match address_at_const_table with
-+  | Some((prefix,(address,command)),size) -> table
-+  | None-> 
-+  (
-+    match const with
-+    | Sexpr(Bool x)-> table
-+    | Sexpr(Char x)-> (add_to_const_table const table ("MAKE_LITERAL_CHAR("^(string_of_int(Char.code x))^")") 2)
-+    | Sexpr(Number(Int(x))) -> (add_to_const_table const table ("MAKE_LITERAL_INT(" ^ (string_of_int x) ^ ")") 9 )
-+    | Sexpr(Number(Float(x))) -> (add_to_const_table const table ("MAKE_LITERAL_FLOAT(" ^ (string_of_float x) ^ ")") 9 )
-+    | Sexpr(Pair(x,y)) -> let newtbl = (dealing_with_const_before_enter_to_table (Sexpr x) table ) in 
-+                            let newtbl = (dealing_with_const_before_enter_to_table (Sexpr y) newtbl ) in
-+                              let add_of_x = find_address (Sexpr x) newtbl in
-+                                let add_of_y = find_address (Sexpr y) newtbl in
-+                                (add_to_const_table const newtbl ("MAKE_LITERAL_PAIR(const_tbl+"
-+                                   ^ (string_of_int add_of_x) ^ ", const_tbl+"^ (string_of_int add_of_y)^")") 17) 
-+    | Sexpr(String x) -> (add_to_const_table const table ("MAKE_LITERAL_STRING "^(make_string_to_fvar x)^" ") ((String.length x)+9))
-+    | Sexpr(Symbol x) -> let newtbl = (dealing_with_const_before_enter_to_table (Sexpr(String x)) table ) in 
-+                          let add_of_x = find_address (Sexpr(String x)) newtbl in
-+                          ([add_to_const_table const newtbl ("MAKE_LITERAL_SYMBOL(const_tbl+"
-+                          ^ (string_of_int add_of_x) ^ ")") 9) ; 9]
-  
+  and const_Handler const const_tbl offset=
+  let address_at_const_table= (find_const_addr const const_tbl) in  
+  match address_at_const_table with
+  | -1-> 
+  (
+    match const with
+    | Sexpr(Char x)-> (add_to_const_table const tbl offset ("MAKE_LITERAL_CHAR("^(string_of_int(Char.code x))^")") 2)
+    | Sexpr(Number(Fraction(x,y))) -> (add_to_const_table const tbl offset ("MAKE_LITERAL_RATIONAL(" ^ (string_of_int x) ^ (string_of_int y) ")") 17 )
+    | Sexpr(Number(Float(x))) ->  (add_to_const_table const tbl offset ("MAKE_LITERAL_FLOAT(" ^ (string_of_float x) ^ ")") 9 )
+    | Sexpr(Pair(x,y)) -> let newtbl = (const_Handler (Sexpr x) tbl offset ) in 
+                        (match newtbl with 
+                        |(tbl,offset)-> let newtbl = (const_Handler (Sexpr y) newtbl offset ) in
+                                          let add_of_x = find_const_addr (Sexpr x) newtbl in
+                                            let add_of_y = find_const_addr (Sexpr y) newtbl in
+                                            (add_to_const_tbl const newtbl ("MAKE_LITERAL_PAIR(const_tbl+"
+                                              ^ (string_of_int add_of_x) ^ ", const_tbl+"^ (string_of_int add_of_y)^")") 17) 
+                        |_-> raise X_this_should_not_happen)
+                            
+    | Sexpr(String x) -> (add_to_const_tbl const tbl ("MAKE_LITERAL_STRING "^(make_string_to_fvar x)^" ") ((String.length x)+9))
+    | Sexpr(Symbol x) -> let newtbl = (const_Handler (Sexpr(String x)) tbl ) in 
+                          let add_of_x = find_const_addr (Sexpr(String x)) newtbl in
+                          (add_to_const_tbl const newtbl ("MAKE_LITERAL_SYMBOL(const_tbl+"
+                          ^ (string_of_int add_of_x) ^ ")") 9) 
+    |_->(const_tbl,offset)
+  | _ -> (const_tbl,offset)
+
   let make_consts_tbl asts = 
     let cnst_tbl=List.fold_left (fun acc curr-> (eval_const curr acc))
-   [[(Void, (0, "MAKE_VOID"));
+   ([(Void, (0, "MAKE_VOID"));
     (Sexpr(Nil), (1, "MAKE_NIL"));
     (Sexpr(Bool false), (2, "MAKE_BOOL(0)"));
-    (Sexpr(Bool true), (4, "MAKE_BOOL(1)"))];6] asts 
+    (Sexpr(Bool true), (4, "MAKE_BOOL(1)"))],6) asts 
+    
   let make_fvars_tbl asts = raise X_not_yet_implemented;;
   let generate consts fvars e = raise X_not_yet_implemented;;
 end;;
