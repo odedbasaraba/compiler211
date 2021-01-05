@@ -31,6 +31,7 @@ module type CODE_GEN = sig
 end;;
 
 module Code_Gen : CODE_GEN = struct
+  (*~~~~~~~~~~~~~~~~~~~~~~~~~~~make const table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
   let get_offset const_tbl_and_ofsset=
     match const_tbl_and_ofsset with 
     |(_,num) -> num
@@ -127,8 +128,48 @@ module Code_Gen : CODE_GEN = struct
     match ze with 
     |(tbl,mashu)->tbl
     |_ -> [];; 
-    
-  let make_fvars_tbl asts = raise X_not_yet_implemented;;
+  (*~~~~~~~~~~~~~~~~~~~~~~~~~~~make const table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
+
+  let rec  find_fvar var tbl =
+    match tbl with 
+    | (fvar, addr)::tl -> if(var = fvar) then addr else (find_fvar var tl) 
+    | []-> -1;;
+  let rec make_Fvar_exp ast fvar_tbl= 
+      match ast with
+      | If'(test,dit,dif) -> 
+      let fvar_tbl = (make_Fvar_exp test fvar_tbl) in
+      let fvar_tbl = (make_Fvar_exp dit fvar_tbl) in
+                     (make_Fvar_exp dif fvar_tbl)
+      | LambdaSimple'(args,body) -> (make_Fvar_exp body fvar_tbl)
+      | LambdaOpt'(args,arg,body) -> (make_Fvar_exp body fvar_tbl)
+      | Set' (y, z)-> 
+      let var = Var'(y) in 
+        let fvar_tbl = (make_Fvar_exp var fvar_tbl) in
+                       (make_Fvar_exp z fvar_tbl) 
+      | Def' (variable,y) ->
+       let var = Var'(variable) in 
+       let fvar_tbl = (make_Fvar_exp var fvar_tbl) in
+                       (make_Fvar_exp y fvar_tbl) 
+      | Or' (args) -> (List.fold_left (fun acc curr-> (make_Fvar_exp curr acc))  fvar_tbl args)
+      | Applic' (op,args)-> 
+        let fvar_tbl= (List.fold_left (fun acc curr-> (make_Fvar_exp curr acc))  fvar_tbl args) in
+                      (make_Fvar_exp op fvar_tbl)
+      | ApplicTP' (op,args) ->
+        let fvar_tbl= (List.fold_left (fun acc curr-> (make_Fvar_exp curr acc))  fvar_tbl args) in
+                      (make_Fvar_exp op fvar_tbl)
+      | Seq' (body)-> (List.fold_left (fun acc curr-> (make_Fvar_exp curr acc))  fvar_tbl body)
+      | BoxSet'(var,exp)-> (make_Fvar_exp exp fvar_tbl)
+      | Var'(VarFree(name))-> 
+                      let check_exist =(find_fvar name fvar_tbl) in
+                      match check_exist with
+                      | -1-> let new_fvar = (name,((List.length fvar_tbl)*8)) in 
+                                             List.rev(new_fvar ::(List.rev(fvar_tbl)))
+                      |_ -> fvar_tbl
+                      
+      | _-> fvar_tbl
+  let make_fvars_tbl asts = List.fold_left (fun acc curr-> 
+                                           (make_Fvar_exp curr acc))  
+                                           [("car",0);("cdr",8);("map",16)] asts;;
   let generate consts fvars e = raise X_not_yet_implemented;;
 end;;
 
