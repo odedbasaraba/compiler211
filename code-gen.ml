@@ -159,12 +159,12 @@ module Code_Gen : CODE_GEN = struct
                       (make_Fvar_exp op fvar_tbl)
       | Seq' (body)-> (List.fold_left (fun acc curr-> (make_Fvar_exp curr acc))  fvar_tbl body)
       | BoxSet'(var,exp)-> (make_Fvar_exp exp fvar_tbl)
-      | Var'(VarFree(name))-> 
+      | Var'(VarFree(name))->( 
                       let check_exist =(find_fvar name fvar_tbl) in
                       match check_exist with
                       | -1-> let new_fvar = (name,((List.length fvar_tbl)*8)) in 
                                              List.rev(new_fvar ::(List.rev(fvar_tbl)))
-                      |_ -> fvar_tbl
+                      |_ -> fvar_tbl)
                       
       | _-> fvar_tbl
   let make_fvars_tbl asts = List.fold_left (fun acc curr-> 
