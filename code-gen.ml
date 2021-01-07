@@ -130,6 +130,7 @@ module Code_Gen : CODE_GEN = struct
     |_ -> [];; 
   (*~~~~~~~~~~~~~~~~~~~~~~~~~~~make const table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 
+(*~~~~~~~~~~~~~~~~~~~~~~~~~~~make fvar table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
   let rec  find_fvar var tbl =
     match tbl with 
     | (fvar, addr)::tl -> if(var = fvar) then addr else (find_fvar var tl) 
@@ -170,6 +171,54 @@ module Code_Gen : CODE_GEN = struct
   let make_fvars_tbl asts = List.fold_left (fun acc curr-> 
                                            (make_Fvar_exp curr acc))  
                                            [("car",0);("cdr",8);("map",16)] asts;;
-  let generate consts fvars e = raise X_not_yet_implemented;;
+(*~~~~~~~~~~~~~~~~~~~~~~~~~~~make fvar table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
+
+(*~~~~~~~~~~~~~~~~~~~~~~~~~~~GENERATE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
+
+  let rec generate consts fvars e = 
+    match e with 
+    | Const' (cns)->  let addr = find_const_addr cns consts in
+                    if (addr = -1) raise X_syntax_error
+                    else "mov rax, const_tbl+" ^ (string_of_int addr) ^" \n "
+    | Var'(VarParam'(_, minor))->
+                    "mov rax, qword [rbp + 8 * (4 + "^(string_of_int minor)^")]"^" \n "
+    | Set(Var'(VarParam'(_, minor)),eps) ->
+                    (generate consts fvars eps)^
+                    "mov qword [rbp + 8 ∗ (4 +"^(string_of_int minor)^")], rax"^"\n"^
+                    "mov rax, SOB_VOID_ADDRESS"^"\n"
+    | Var'(VarBound(_, major, minor)) ->
+                    "mov rax, qword [rbp + 8 * 2]"^"\n"^
+                    "mov rax, qword [rax + 8 * " ^ (string_of_int major)^"]"^"\n" ^
+                    "mov rax, qword [rax + 8 * " ^(string_of_int minor)^"]"^"\n" 
+    |Set'(Var'(VarBound(_,major, minor)),z)->
+                    (generate consts fvars z)^
+                    "mov rbx, qword [rbp + 8 * 2]"^"\n"^
+                    "mov rbx, qword [rbx + 8 * "^ (string_of_int major)^"]"^"\n"^
+                    "mov qword [rbx + 8 * "^ (string_of_int minor)^"], rax"^"\n"^
+                    "mov rax, SOB_VOID_ADDRESS"^"\n"
+    | Var'(VarFree'(v)) -> 
+                    let addr = find_fvar v fvars in
+                    if (addr = -1) raise X_syntax_error
+                    else "mov rax, qword ["^(string_of_int addr)^"]\n" 
+    | Set(Var'(VarFree'(v)),eps) ->   
+                    let addr = find_fvar v fvars in
+                    if (addr = -1) raise X_syntax_error 
+                    else (generate consts fvars eps)^
+                    "mov qword [fvar_tbl + "^(string_of_int addr)^"], rax \n"^
+                    "mov rax, SOB_VOID_ADDRESS"^"\n" 
+    | Seq' (exps)-> 
+                    (String.concat "\n" (List.map (fun eps-> (generate consts fvars eps)) exps)) (*check if need to seperate with \n*) 
+    | BoxGet'(Var'(v))->
+                    (generate consts fvars Var'(v))^
+                    "mov rax, qword [rax]"^"\n"
+    | BoxSet'(Var'(v),eps)->
+                    (generate consts fvars eps)^
+                    "push rax"^"\n"
+                    (generate consts fvars Var'(v))^
+                    "pop qword [rax]"^"\n"
+                    "mov rax, SOB_VOID_ADDRESS"^"\n"
+    
+
+                                                          ;;
 end;;
 
