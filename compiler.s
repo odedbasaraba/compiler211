@@ -74,6 +74,12 @@
 	mov byte [%1+TYPE_SIZE], %2
 %endmacro
 
+%macro MAKE_BOOL_VALUE 2
+	MALLOC %1, 1+TYPE_SIZE
+	mov byte [%1], T_BOOL
+	mov byte [%1+TYPE_SIZE], %2
+%endmacro
+
 %macro MAKE_LITERAL 2 ; Make a literal of type %1; followed by the size and def %2
 	db %1
 	%2
@@ -83,7 +89,7 @@
 %define MAKE_LITERAL_CHAR(val) MAKE_LITERAL T_CHAR, db val
 %define MAKE_NIL db T_NIL
 %define MAKE_VOID db T_VOID
-%define MAKE_BOOL(val) MAKE_LITERAL T_BOOL, db val
+%define MAKE_LITERAL_BOOL(val) MAKE_LITERAL T_BOOL, db val
 %define MAKE_LITERAL_SYMBOL(val) MAKE_LITERAL T_SYMBOL, dq val
 
 %macro MAKE_LITERAL_STRING 1
