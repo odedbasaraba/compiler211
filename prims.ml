@@ -234,33 +234,58 @@ module Prims : PRIMS = struct
          CHAR_VAL rdi, rdi
          and rdi, 255
          MAKE_STRING rax, rsi, dil", make_binary, "make_string";
+
+        "mov rsi, PVAR(0)
+         mov qword rax, [rsi+1]
+         mov rsp, rbp", make_unary, "car";
+
+        "mov rsi, PVAR(0)
+         mov qword rax, [rsi+TYPE_SIZE+WORD_SIZE]
+         mov rsp, rbp", make_unary, "cdr";
+
+        "mov rsi, PVAR(0)
+         mov rax, PVAR(1)
+         mov qword [rsi+TYPE_SIZE], rax
+         mov rax, SOB_VOID_ADDRESS
+         mov rsp, rbp", make_unary, "set_car";
+
+        "mov rsi, PVAR(0)
+         mov rax, PVAR(1)
+         mov qword[rsi+TYPE_SIZE+WORD_SIZE], rax
+         mov rax, SOB_VOID_ADDRESS
+         mov rsp, rbp", make_unary, "set_cdr";
+
+        "mov rcx, PVAR(0)
+         mov rdx, PVAR(1)
+         MAKE_PAIR(rax,rcx,rdx) 
+         mov rsp, rbp", make_binary, "cons"; (*rcx->car,rdx->cdr*)
         
         "SYMBOL_VAL rsi, rsi
-	 STRING_LENGTH rcx, rsi
-	 STRING_ELEMENTS rdi, rsi
-	 push rcx
-	 push rdi
-	 mov dil, byte [rdi]
-	 MAKE_CHAR(rax, dil)
-	 push rax
-	 MAKE_RATIONAL(rax, rcx, 1)
-	 push rax
-	 push 2
-	 push SOB_NIL_ADDRESS
-	 call make_string
-	 add rsp, 4*8
-	 STRING_ELEMENTS rsi, rax   
-	 pop rdi
-	 pop rcx
-	 cmp rcx, 0
-	 je .end
-         .loop:
-	 lea r8, [rdi+rcx]
-	 lea r9, [rsi+rcx]
-	 mov bl, byte [r8]
-	 mov byte [r9], bl
-	 loop .loop
-         .end:", make_unary, "symbol_to_string";
+	       STRING_LENGTH rcx, rsi
+	       STRING_ELEMENTS rdi, rsi
+	       push rcx
+	       push rdi
+	       mov dil, byte [rdi]
+	       MAKE_CHAR(rax, dil)
+	       push rax
+	       MAKE_RATIONAL(rax, rcx, 1)
+	       push rax
+	       push 2
+	       push SOB_NIL_ADDRESS
+	       call make_string
+	       add rsp, 4*8
+	       STRING_ELEMENTS rsi, rax   
+	       pop rdi
+	       pop rcx
+	       cmp rcx, 0
+	       je .end
+        .loop:
+	       lea r8, [rdi+rcx]
+	       lea r9, [rsi+rcx]
+	       mov bl, byte [r8]
+	       mov byte [r9], bl
+	       loop .loop
+               .end:", make_unary, "symbol_to_string";
 
         (* the identity predicate (i.e., address equality) *)
         (return_boolean_eq "cmp rsi, rdi"), make_binary, "eq?";

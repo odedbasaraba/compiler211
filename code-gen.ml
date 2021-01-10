@@ -170,7 +170,18 @@ module Code_Gen : CODE_GEN = struct
       | _-> fvar_tbl
   let make_fvars_tbl asts = List.fold_left (fun acc curr-> 
                                            (make_Fvar_exp curr acc))  
-                                           [("car",0);("cdr",8);("map",16)] asts;;
+                                           [("car",0);("cdr",8);("map",16);("boolean?",24);("flonum?",32); ("rational?"40);
+                                           ("pair?",48); ("null?",56);("char?",64);("string?",72);
+                                           ("procedure?",80);("symbol?",88);("string-length",96);("string-ref",104);("string-set!",112);
+                                           ("make-string",120) ;("symbol->string",128);
+                                           (* Type conversions *)
+                                           ("char->integer",136);("integer->char",144); "exact->inexact", "exact_to_inexact";
+                                           (* Identity test *)
+                                           "eq?", "eq?";
+                                           (* Arithmetic ops *)
+                                           "+", "add"; "*", "mul"; "/", "div"; "=", "eq"; "<", "lt";
+                                           (* Additional rational numebr ops *)
+                                           "numerator", "numerator"; "denominator", "denominator"; "gcd", "gcd";] asts;;
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~make fvar table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~GENERATE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
