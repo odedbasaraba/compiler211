@@ -94,7 +94,7 @@ module Code_Gen : CODE_GEN = struct
     (
       match const with
       | Sexpr(Char x)-> ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_CHAR("^(string_of_int(Char.code x))^")")),(offset +2))
-      | Sexpr(Number(Fraction(x,y))) -> ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_RATIONAL(" ^ (string_of_int x) ^ " " ^ (string_of_int y) ^ ")")  ),(offset+17))
+      | Sexpr(Number(Fraction(x,y))) -> ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_RATIONAL(" ^ (string_of_int x) ^ ", " ^ (string_of_int y) ^ ")")  ),(offset+17))
       | Sexpr(Number(Float(x))) ->  ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_FLOAT(" ^ (string_of_float x) ^ ")")) ,(offset+9) )
       | Sexpr(Pair(x,y)) -> let newtbl_and_offset = (const_Handler (Sexpr x) const_tbl offset )  in 
                               let add_of_x = offset in (* just change the name in order to have clean code *)
@@ -122,15 +122,34 @@ module Code_Gen : CODE_GEN = struct
   let make_consts_tbl asts = 
    let ze = (List.fold_left (fun acc curr-> (eval_const curr acc))
    ([(Void, (0, "MAKE_VOID"));
-    (Sexpr(Nil), (1, "MAKE_NIL"));
-    (Sexpr(Bool false), (2, "MAKE_BOOL(0)"));
-    (Sexpr(Bool true), (4, "MAKE_BOOL(1)"))],6) asts) in
+    (Sexpr Nil, (1, "MAKE_NIL"));
+    (Sexpr(Bool false), (2, "MAKE_LITERAL_BOOL (0)"));
+    (Sexpr(Bool true), (4, "MAKE_LITERAL_BOOL (1)"))],6) asts) in
     match ze with 
     |(tbl,mashu)->tbl
     |_ -> [];; 
   (*~~~~~~~~~~~~~~~~~~~~~~~~~~~make const table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~make fvar table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
+let primitive_names_to_labels =
+  [
+    (* Type queries  *)
+    "boolean?", "boolean?"; "flonum?", "flonum?"; "rational?", "rational?";
+    "pair?", "pair?"; "null?", "null?"; "char?", "char?"; "string?", "string?";
+    "procedure?", "procedure?"; "symbol?", "symbol?";
+    (* String procedures *)
+    "string-length", "string_length"; "string-ref", "string_ref"; "string-set!", "string_set";
+    "make-string", "make_string"; "symbol->string", "symbol_to_string";
+    (* Type conversions *)
+    "char->integer", "char_to_integer"; "integer->char", "integer_to_char"; "exact->inexact", "exact_to_inexact";
+    (* Identity test *)
+    "eq?", "eq?";
+    (* Arithmetic ops *)
+    "+", "add"; "*", "mul"; "/", "div"; "=", "eq"; "<", "lt";
+    (* Additional rational numebr ops *)
+    "numerator", "numerator"; "denominator", "denominator"; "gcd", "gcd";
+    (* you can add yours here *)
+  ]
   let rec  find_fvar var tbl =
     match tbl with 
     | (fvar, addr)::tl -> if(var = fvar) then addr else (find_fvar var tl) 
@@ -170,18 +189,18 @@ module Code_Gen : CODE_GEN = struct
       | _-> fvar_tbl
   let make_fvars_tbl asts = List.fold_left (fun acc curr-> 
                                            (make_Fvar_exp curr acc))  
-                                           [("car",0);("cdr",8);("map",16);("boolean?",24);("flonum?",32); ("rational?"40);
+                                           [("car",0);("cdr",8);("map",16);("boolean?",24);("flonum?",32); ("rational?",40);
                                            ("pair?",48); ("null?",56);("char?",64);("string?",72);
                                            ("procedure?",80);("symbol?",88);("string-length",96);("string-ref",104);("string-set!",112);
                                            ("make-string",120) ;("symbol->string",128);
                                            (* Type conversions *)
-                                           ("char->integer",136);("integer->char",144); "exact->inexact", "exact_to_inexact";
+                                           ("char->integer",136);("integer->char",144);("exact->inexact",152);
                                            (* Identity test *)
-                                           "eq?", "eq?";
+                                           ("eq?",160);
                                            (* Arithmetic ops *)
-                                           "+", "add"; "*", "mul"; "/", "div"; "=", "eq"; "<", "lt";
+                                           ("+",168);("*",176);("/",184) ; ("=",192);("<",200);
                                            (* Additional rational numebr ops *)
-                                           "numerator", "numerator"; "denominator", "denominator"; "gcd", "gcd";] asts;;
+                                           ("numerator",208);("denominator",216);("gcd",224);("apply",232);("cons",240);("set-car!",248);("set-cdr!",256)] asts;;
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~make fvar table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~GENERATE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
@@ -189,37 +208,37 @@ module Code_Gen : CODE_GEN = struct
   let rec generate consts fvars e = 
     match e with 
     | Const' (cns)->  let addr = find_const_addr cns consts in
-                    if (addr = -1) raise X_syntax_error
+                    if (addr == -1) then raise X_syntax_error
                     else "mov rax, const_tbl+" ^ (string_of_int addr) ^" \n "
-    | Var'(VarParam'(_, minor))->
+    | Var'(VarParam(_, minor))->
                     "mov rax, qword [rbp + 8 * (4 + "^(string_of_int minor)^")]"^" \n "
-    | Set(Var'(VarParam'(_, minor)),eps) ->
+    (* | Set'(Var'(VarParam(_, minor)),eps) ->
                     (generate consts fvars eps)^
                     "mov qword [rbp + 8 ∗ (4 +"^(string_of_int minor)^")], rax"^"\n"^
-                    "mov rax, SOB_VOID_ADDRESS"^"\n"
+                    "mov rax, SOB_VOID_ADDRESS"^"\n" *)
     | Var'(VarBound(_, major, minor)) ->
                     "mov rax, qword [rbp + 8 * 2]"^"\n"^
                     "mov rax, qword [rax + 8 * " ^ (string_of_int major)^"]"^"\n" ^
                     "mov rax, qword [rax + 8 * " ^(string_of_int minor)^"]"^"\n" 
-    |Set'(Var'(VarBound(_,major, minor)),z)->
+    (* |Set'(Var'(VarBound(_,major, minor)),z)->
                     (generate consts fvars z)^
                     "mov rbx, qword [rbp + 8 * 2]"^"\n"^
                     "mov rbx, qword [rbx + 8 * "^ (string_of_int major)^"]"^"\n"^
                     "mov qword [rbx + 8 * "^ (string_of_int minor)^"], rax"^"\n"^
-                    "mov rax, SOB_VOID_ADDRESS"^"\n"
-    | Var'(VarFree'(v)) -> 
+                    "mov rax, SOB_VOID_ADDRESS"^"\n" *)
+    | Var'(VarFree(v)) -> 
                     let addr = find_fvar v fvars in
-                    if (addr = -1) raise X_syntax_error
+                    if (addr = -1) then raise X_syntax_error
                     else "mov rax, qword ["^(string_of_int addr)^"]\n" 
-    | Set(Var'(VarFree'(v)),eps) ->   
+    (* | Set(Var'(VarFree(v)),eps) ->   
                     let addr = find_fvar v fvars in
-                    if (addr = -1) raise X_syntax_error 
+                    if (addr = -1)  then raise X_syntax_error 
                     else (generate consts fvars eps)^
                     "mov qword [fvar_tbl + "^(string_of_int addr)^"], rax \n"^
-                    "mov rax, SOB_VOID_ADDRESS"^"\n" 
+                    "mov rax, SOB_VOID_ADDRESS"^"\n"  *)
     | Seq' (exps)-> 
                     (String.concat "\n" (List.map (fun eps-> (generate consts fvars eps)) exps)) (*check if need to seperate with \n*) 
-    | BoxGet'(Var'(v))->
+    (* | BoxGet'(Var'(v))->
                     (generate consts fvars Var'(v))^
                     "mov rax, qword [rax]"^"\n"
     | BoxSet'(Var'(v),eps)->
@@ -227,8 +246,8 @@ module Code_Gen : CODE_GEN = struct
                     "push rax"^"\n"
                     (generate consts fvars Var'(v))^
                     "pop qword [rax]"^"\n"
-                    "mov rax, SOB_VOID_ADDRESS"^"\n"
-    
+                    "mov rax, SOB_VOID_ADDRESS"^"\n" *)
+    |_ ->  raise X_this_should_not_happen
 
                                                           ;;
 end;;
