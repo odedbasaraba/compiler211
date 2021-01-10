@@ -35,14 +35,12 @@ module Code_Gen : CODE_GEN = struct
   let get_offset const_tbl_and_ofsset=
     match const_tbl_and_ofsset with 
     |(_,num) -> num
-    |_-> raise X_this_should_not_happen;;
+   ;;
 
 
   let get_const_tbl const_tbl_and_ofsset=
     match const_tbl_and_ofsset with 
-    |(const_tbl,_) ->const_tbl
-    
-    |_-> raise X_this_should_not_happen;;
+    |(const_tbl,_) ->const_tbl;;
 
   let add_to_const_table const tbl offset assembly_expression = 
     (List.append tbl ([(const, (offset, assembly_expression))]));;
@@ -61,7 +59,7 @@ module Code_Gen : CODE_GEN = struct
       match ast with
       | If'(test,dit, dif) -> 
         let new_const_tbl_and_ofsset= (eval_const test const_tbl_and_ofsset) in
-        let new_const_tbl_and_ofsset= (eval_const dit const_tbl_and_ofsset) in
+        let new_const_tbl_and_ofsset= (eval_const dit new_const_tbl_and_ofsset) in
           (eval_const dif new_const_tbl_and_ofsset)
       | LambdaSimple'(args,body) -> (eval_const body const_tbl_and_ofsset)
       | LambdaOpt'(args,arg,body) -> (eval_const body const_tbl_and_ofsset)
@@ -103,19 +101,21 @@ module Code_Gen : CODE_GEN = struct
                                                     (match newtbl_and_offset with 
                                                     |(tbl,offset_of_pair) -> ((add_to_const_table const tbl offset_of_pair ("MAKE_LITERAL_PAIR("
                                                       ^ (string_of_int add_of_x) ^ ", " ^ (string_of_int add_of_y)^ ")")),(offset_of_pair+17) )
-                                |_-> raise X_this_should_not_happen))
-                              
+                                ))
+      | Sexpr(Bool x)-> (const_tbl,offset) 
+      | Sexpr (Nil) ->   (const_tbl,offset)
+      | Void ->   (const_tbl,offset)                      
       | Sexpr(String x) -> ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_STRING "^(make_string_char_list x)^" ")), ((String.length x)+9))
       | Sexpr(Symbol x) -> let newtbl_and_offset = (const_Handler (Sexpr(String x)) const_tbl offset) in 
                               let add_of_x= offset in
                               match newtbl_and_offset with 
                               | (tbl,symbol_offset)->  ((add_to_const_table const tbl symbol_offset ("MAKE_LITERAL_SYMBOL(const_tbl+"
                             ^ (string_of_int add_of_x) ^ ")") ),(symbol_offset+ 9))
-                              |_-> raise X_this_should_not_happen
+                          
     
     
-      
-    | _ -> (const_tbl,offset)
+  
+    
     )
     | _ -> (const_tbl,offset)
     ;;
@@ -127,7 +127,7 @@ module Code_Gen : CODE_GEN = struct
     (Sexpr(Bool true), (4, "MAKE_LITERAL_BOOL (1)"))],6) asts) in
     match ze with 
     |(tbl,mashu)->tbl
-    |_ -> [];; 
+    ;; 
   (*~~~~~~~~~~~~~~~~~~~~~~~~~~~make const table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~make fvar table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
@@ -212,41 +212,41 @@ let primitive_names_to_labels =
                     else "mov rax, const_tbl+" ^ (string_of_int addr) ^" \n "
     | Var'(VarParam(_, minor))->
                     "mov rax, qword [rbp + 8 * (4 + "^(string_of_int minor)^")]"^" \n "
-    (* | Set'(Var'(VarParam(_, minor)),eps) ->
+    | Set'((VarParam(_, minor)),eps) ->
                     (generate consts fvars eps)^
                     "mov qword [rbp + 8 ∗ (4 +"^(string_of_int minor)^")], rax"^"\n"^
-                    "mov rax, SOB_VOID_ADDRESS"^"\n" *)
+                    "mov rax, SOB_VOID_ADDRESS"^"\n"
     | Var'(VarBound(_, major, minor)) ->
                     "mov rax, qword [rbp + 8 * 2]"^"\n"^
                     "mov rax, qword [rax + 8 * " ^ (string_of_int major)^"]"^"\n" ^
                     "mov rax, qword [rax + 8 * " ^(string_of_int minor)^"]"^"\n" 
-    (* |Set'(Var'(VarBound(_,major, minor)),z)->
+    |Set'((VarBound(_,major, minor)),z)->
                     (generate consts fvars z)^
                     "mov rbx, qword [rbp + 8 * 2]"^"\n"^
                     "mov rbx, qword [rbx + 8 * "^ (string_of_int major)^"]"^"\n"^
                     "mov qword [rbx + 8 * "^ (string_of_int minor)^"], rax"^"\n"^
-                    "mov rax, SOB_VOID_ADDRESS"^"\n" *)
+                    "mov rax, SOB_VOID_ADDRESS"^"\n"
     | Var'(VarFree(v)) -> 
                     let addr = find_fvar v fvars in
                     if (addr = -1) then raise X_syntax_error
                     else "mov rax, qword ["^(string_of_int addr)^"]\n" 
-    (* | Set(Var'(VarFree(v)),eps) ->   
+    | Set'((VarFree(v)),eps) ->   
                     let addr = find_fvar v fvars in
                     if (addr = -1)  then raise X_syntax_error 
                     else (generate consts fvars eps)^
                     "mov qword [fvar_tbl + "^(string_of_int addr)^"], rax \n"^
-                    "mov rax, SOB_VOID_ADDRESS"^"\n"  *)
+                    "mov rax, SOB_VOID_ADDRESS"^"\n" 
     | Seq' (exps)-> 
                     (String.concat "\n" (List.map (fun eps-> (generate consts fvars eps)) exps)) (*check if need to seperate with \n*) 
-    (* | BoxGet'(Var'(v))->
-                    (generate consts fvars Var'(v))^
+    | BoxGet'(v)->
+                    (generate consts fvars (Var' v))^
                     "mov rax, qword [rax]"^"\n"
-    | BoxSet'(Var'(v),eps)->
+    | BoxSet'(v,eps)->
                     (generate consts fvars eps)^
-                    "push rax"^"\n"
-                    (generate consts fvars Var'(v))^
-                    "pop qword [rax]"^"\n"
-                    "mov rax, SOB_VOID_ADDRESS"^"\n" *)
+                    "push rax"^"\n"^
+                    (generate consts fvars (Var' v))^
+                    "pop qword [rax]"^"\n"^
+                    "mov rax, SOB_VOID_ADDRESS"^"\n"
     |_ ->  raise X_this_should_not_happen
 
                                                           ;;
