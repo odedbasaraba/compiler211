@@ -3,9 +3,18 @@
 #use "prims.ml";;
 
 
+let till_3 program= List.map Semantics.run_semantics
+                (Tag_Parser.tag_parse_expressions
+                  (Reader.read_sexprs program))
+let const_watch program = let asts = till_3 program in 
+                         Code_Gen.make_consts_tbl asts
 
-
-
+let free_watch program = let asts = till_3 program in 
+                         Code_Gen.make_fvars_tbl asts
+let generate_watch  program = let asts= till_3 program in
+                            let fvars_tbl= free_watch program in 
+                            let consts_tbl =  const_watch program  in 
+                             List.map (Code_Gen.generate consts_tbl fvars_tbl) asts;;
 (* 
    Auxiliary function to load the contents of a file into a string in memory.
    Note: exceptions are not handled here, and are expected to be handled 

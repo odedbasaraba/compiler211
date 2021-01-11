@@ -105,7 +105,7 @@ module Code_Gen : CODE_GEN = struct
       | Sexpr(Bool x)-> (const_tbl,offset) 
       | Sexpr (Nil) ->   (const_tbl,offset)
       | Void ->   (const_tbl,offset)                      
-      | Sexpr(String x) -> ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_STRING "^(make_string_char_list x)^" ")), ((String.length x)+9))
+      | Sexpr(String x) -> ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_STRING "^(make_string_char_list x)^" ")), ((String.length x)+9+offset))
       | Sexpr(Symbol x) -> let newtbl_and_offset = (const_Handler (Sexpr(String x)) const_tbl offset) in 
                               let add_of_x= offset in
                               match newtbl_and_offset with 
@@ -204,14 +204,32 @@ let primitive_names_to_labels =
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~make fvar table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~GENERATE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
+  let make_lazy_list initial next =
+    let lazy_list current ()= 
+      let result = !current in
+      current := (next !current); result 
+      in lazy_list (ref initial);;
+  let new_id=make_lazy_list 0 (function i -> i+1);;
 
   let rec generate consts fvars e = 
     match e with 
-    | Const' (cns)->  let addr = find_const_addr cns consts in
+    | Const' (cns) ->  let addr = find_const_addr cns consts in
                     if (addr == -1) then raise X_syntax_error
-                    else "mov rax, const_tbl+" ^ (string_of_int addr) ^" \n "
+                    else "mov rax, const_tbl+" ^ (string_of_int addr) ^" \n"
+    | Seq' (exps)-> 
+      (String.concat "\n" (List.map (fun eps-> (generate consts fvars eps)) exps)) (*check if need to seperate with \n*) 
+    | If'  (test,dit,dif) ->
+                           let id=(string_of_int (new_id())) in
+                            (generate consts fvars test)^
+                            "cmp rax, SOB_FALSE_ADDRESS\n"^
+                            "je Lelse" ^ id ^ "\n"^
+                            (generate consts fvars dit)^
+                            "jmp Lexit" ^ id ^ "\n"^
+                            "Lelse" ^ id ^ ":\n"^
+                            (generate consts fvars dif)^
+                            "Lexit" ^ id ^ ":\n"
     | Var'(VarParam(_, minor))->
-                    "mov rax, qword [rbp + 8 * (4 + "^(string_of_int minor)^")]"^" \n "
+                    "mov rax, qword [rbp + 8 * (4 + "^(string_of_int minor)^")]"^" \n"
     | Set'((VarParam(_, minor)),eps) ->
                     (generate consts fvars eps)^
                     "mov qword [rbp + 8 ∗ (4 +"^(string_of_int minor)^")], rax"^"\n"^
@@ -229,25 +247,42 @@ let primitive_names_to_labels =
     | Var'(VarFree(v)) -> 
                     let addr = find_fvar v fvars in
                     if (addr = -1) then raise X_syntax_error
-                    else "mov rax, qword ["^(string_of_int addr)^"]\n" 
-    | Set'((VarFree(v)),eps) ->   
-                    let addr = find_fvar v fvars in
-                    if (addr = -1)  then raise X_syntax_error 
-                    else (generate consts fvars eps)^
-                    "mov qword [fvar_tbl + "^(string_of_int addr)^"], rax \n"^
-                    "mov rax, SOB_VOID_ADDRESS"^"\n" 
-    | Seq' (exps)-> 
-                    (String.concat "\n" (List.map (fun eps-> (generate consts fvars eps)) exps)) (*check if need to seperate with \n*) 
+                    else "mov rax, qword [fvar_tbl+"^(string_of_int addr)^"]\n" 
+
     | BoxGet'(v)->
                     (generate consts fvars (Var' v))^
                     "mov rax, qword [rax]"^"\n"
+
     | BoxSet'(v,eps)->
                     (generate consts fvars eps)^
                     "push rax"^"\n"^
                     (generate consts fvars (Var' v))^
                     "pop qword [rax]"^"\n"^
                     "mov rax, SOB_VOID_ADDRESS"^"\n"
+    |Or' (lst) ->     let exit_label = "Lexit" ^ (string_of_int (new_id())) in
+                      let last_arg =  (List.nth lst ((List.length lst) - 1)) in
+                      (String.concat "" (List.map 
+                        (fun epsilon -> (generate consts fvars epsilon) ^ 
+                                        "cmp rax, SOB_FALSE_ADDRESS\n"^
+                                        "jne "^exit_label^"\n" ) (List.rev(List.tl(List.rev lst))) ))^
+                                        (generate consts fvars last_arg) ^
+                                        exit_label ^":\n"
+    | Set'((VarFree(v)),eps) ->   
+              let addr = find_fvar v fvars in
+                      if (addr = -1)  then raise X_syntax_error 
+                      else (generate consts fvars eps)^
+                      "mov qword [fvar_tbl + "^(string_of_int addr)^"], rax \n"^
+                      "mov rax, SOB_VOID_ADDRESS"^"\n" 
+    | Def'((VarFree(v)),eps) ->   
+    let addr = find_fvar v fvars in
+            if (addr = -1)  then raise X_syntax_error 
+            else (generate consts fvars eps)^
+            "mov qword [fvar_tbl + "^(string_of_int addr)^"], rax \n"^
+            "mov rax, SOB_VOID_ADDRESS"^"\n" 
+
     |_ ->  raise X_this_should_not_happen
+
+
 
                                                           ;;
 end;;
