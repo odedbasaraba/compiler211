@@ -235,30 +235,17 @@ module Prims : PRIMS = struct
          and rdi, 255
          MAKE_STRING rax, rsi, dil", make_binary, "make_string";
 
-        "mov rsi, PVAR(0)
-         mov qword rax, [rsi+1]
-         mov rsp, rbp", make_unary, "car";
+        "mov qword rax, [rsi+TYPE_SIZE]", make_unary, "car";
 
-        "mov rsi, PVAR(0)
-         mov qword rax, [rsi+TYPE_SIZE+WORD_SIZE]
-         mov rsp, rbp", make_unary, "cdr";
+        "mov qword rax, [rsi+TYPE_SIZE+WORD_SIZE]", make_unary, "cdr";
 
-        "mov rsi, PVAR(0)
-         mov rax, PVAR(1)
-         mov qword [rsi+TYPE_SIZE], rax
-         mov rax, SOB_VOID_ADDRESS
-         mov rsp, rbp", make_unary, "set_car";
+        "mov qword [rsi+TYPE_SIZE], rdi
+         mov rax, SOB_VOID_ADDRESS", make_binary, "set_car";
 
-        "mov rsi, PVAR(0)
-         mov rax, PVAR(1)
-         mov qword[rsi+TYPE_SIZE+WORD_SIZE], rax
-         mov rax, SOB_VOID_ADDRESS
-         mov rsp, rbp", make_unary, "set_cdr";
+        "mov qword[rsi+TYPE_SIZE+WORD_SIZE], rdi
+         mov rax, SOB_VOID_ADDRESS", make_binary, "set_cdr"; (*mov rsp, rbp*)
 
-        "mov rcx, PVAR(0)
-         mov rdx, PVAR(1)
-         MAKE_PAIR(rax,rcx,rdx) 
-         mov rsp, rbp", make_binary, "cons"; (*rcx->car,rdx->cdr*)
+        "MAKE_PAIR(rax,rsi,rdi)", make_binary, "cons"; (*rsi->car,rdi->cdr*)
         
         "SYMBOL_VAL rsi, rsi
 	       STRING_LENGTH rcx, rsi
