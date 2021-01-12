@@ -14,7 +14,7 @@ let free_watch program = let asts = till_3 program in
 let generate_watch  program = let asts= till_3 program in
                             let fvars_tbl= free_watch program in 
                             let consts_tbl =  const_watch program  in 
-                             List.map (Code_Gen.generate consts_tbl fvars_tbl) asts;;
+                             List.map (Code_Gen.generate consts_tbl fvars_tbl 0) asts;;
 (* 
    Auxiliary function to load the contents of a file into a string in memory.
    Note: exceptions are not handled here, and are expected to be handled 
@@ -159,7 +159,7 @@ try
   let fvars_tbl = Code_Gen.make_fvars_tbl asts in  
 
   (* Generate assembly code for each ast and merge them all into a single string *)
-  let generate = Code_Gen.generate consts_tbl fvars_tbl in 
+  let generate = Code_Gen.generate consts_tbl fvars_tbl 0 in 
   let code_fragment = String.concat "\n\n"
                         (List.map
                            (fun ast -> (generate ast) ^ "\n\tcall write_sob_if_not_void")

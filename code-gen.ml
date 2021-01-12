@@ -27,7 +27,7 @@ module type CODE_GEN = sig
      argument is the fvars table type, and the third is an expr' that has been annotated 
      by the semantic analyser.
    *)
-  val generate : (constant * (int * string )) list -> (string * int) list -> expr' -> string
+  val generate : (constant * (int * string )) list -> (string * int) list -> int -> expr'  -> string 
 end;;
 
 module Code_Gen : CODE_GEN = struct
@@ -203,7 +203,77 @@ let primitive_names_to_labels =
                                            ("numerator",208);("denominator",216);("gcd",224);("cons",232);("set-car!",240);("set-cdr!",248)] asts;;(*("apply",232)*)
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~make fvar table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 
+(*~~~~~~~~~~~~~~~~~~~~~~~~Generate Strings~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
+let simple_lambda env_size id lambda_body =
+
+  "push rbx
+  push rcx
+  push rdx
+  push rsi
+  MALLOC rax, WORD_SIZE*" ^env_size^ "; allocate new enviorment \n" ^
+  "mov rbx,[rbp +2 *WORD_SIZE]
+  mov rcx,0 
+  env_copy" ^id^":
+  cmp rcx, " ^env_size^ "\n" ^
+  "je finish_env_copy" ^ id ^"\n"^
+  "mov rdx, [rbx + rcx * WORD_SIZE]
+  inc rcx
+  mov [rax + rcx * WORD_SIZE], rdx
+  jmp env_copy" ^id^"\n" ^ 
+  "finish_env_copy" ^ id ^ ":
+  mov rbx, [rbp + 3 * WORD_SIZE]
+  cmp rbx,0
+  jne allocate_args" ^ id ^ "\n"^
+  "mov rdx, SOB_NIL_ADDRESS
+  jmp finish_copy_args" ^ id ^ "\n"^
+  "allocate_args" ^ id ^ ":
+  shl rbx,3
+  MALLOC rdx, rbx
+  shr rbx,3
+  mov rcx,0
+  copy_args"^id^":
+  cmp rcx,rbx
+  je finish_env_copy" ^ id ^ "\n" ^"
+  mov rsi, PVAR(rcx)
+  mov [rdx + rcx *WORD_SIZE ],rsi
+  inc rcx
+  jmp copy_args" ^ id ^ "\n" ^
+  "finish_copy_args" ^ id ^ ":
+  mov [rax + 0 * WORD_SIZE] , rdx ;place at envorment 0
+  mov rbx,rax
+  MAKE_CLOSURE(rax, rbx, Lcode" ^ id  ^ ")\n" ^
+  "
+  pop rsi
+  pop rdx
+  pop rcx
+  pop rbx
+  jmp Lcont"^id ^ "\n" ^ 
+  "Lcode"^id^":
+    push rbp
+    mov rbp,rsp \n" ^
+    lambda_body ^"\n" ^
+    "leave
+    ret
+    Lcont" ^id ^ ":\n"
+
+
+
+
+  
+  
+  
+
+  ;;
+
+
+
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~GENERATE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
+
+
+
+
+
+
   let make_lazy_list initial next =
     let lazy_list current ()= 
       let result = !current in
@@ -211,38 +281,38 @@ let primitive_names_to_labels =
       in lazy_list (ref initial);;
   let new_id=make_lazy_list 0 (function i -> i+1);;
 
-  let rec generate consts fvars e = 
+  let rec generate consts fvars env_size e = 
     match e with 
     | Const' (cns) ->  let addr = find_const_addr cns consts in
                     if (addr == -1) then raise X_syntax_error
                     else "mov rax, const_tbl+" ^ (string_of_int addr) ^" \n"
     | Seq' (exps)-> 
-      (String.concat "\n" (List.map (fun eps-> (generate consts fvars eps)) exps)) (*check if need to seperate with \n*) 
+      (String.concat "\n" (List.map (fun eps-> (generate consts fvars env_size eps)) exps)) (*check if need to seperate with \n*) 
     | If'  (test,dit,dif) ->
                            let id=(string_of_int (new_id())) in
-                            (generate consts fvars test)^
+                            (generate consts fvars env_size test)^
                             "cmp rax, SOB_FALSE_ADDRESS\n"^
                             "je Lelse" ^ id ^ "\n"^
-                            (generate consts fvars dit)^
+                            (generate consts fvars env_size dit)^
                             "jmp Lexit" ^ id ^ "\n"^
                             "Lelse" ^ id ^ ":\n"^
-                            (generate consts fvars dif)^
+                            (generate consts fvars env_size dif)^
                             "Lexit" ^ id ^ ":\n"
     | Var'(VarParam(_, minor))->
-                    "mov rax, qword [rbp + 8 * (4 + "^(string_of_int minor)^")]"^" \n"
+                    "mov rax, qword [rbp + WORD_SIZE * (4 + "^(string_of_int minor)^")]"^" \n"
     | Set'((VarParam(_, minor)),eps) ->
-                    (generate consts fvars eps)^
-                    "mov qword [rbp + 8 ∗ (4 +"^(string_of_int minor)^")], rax"^"\n"^
+                    (generate consts fvars env_size eps)^
+                    "mov qword [rbp + WORD_SIZE ∗ (4 +"^(string_of_int minor)^")], rax"^"\n"^
                     "mov rax, SOB_VOID_ADDRESS"^"\n"
     | Var'(VarBound(_, major, minor)) ->
-                    "mov rax, qword [rbp + 8 * 2]"^"\n"^
-                    "mov rax, qword [rax + 8 * " ^ (string_of_int major)^"]"^"\n" ^
-                    "mov rax, qword [rax + 8 * " ^(string_of_int minor)^"]"^"\n" 
+                    "mov rax, qword [rbp + WORD_SIZE * 2]"^"\n"^
+                    "mov rax, qword [rax + WORD_SIZE * " ^ (string_of_int major)^"]"^"\n" ^
+                    "mov rax, qword [rax + WORD_SIZE * " ^(string_of_int minor)^"]"^"\n" 
     |Set'((VarBound(_,major, minor)),z)->
-                    (generate consts fvars z)^
-                    "mov rbx, qword [rbp + 8 * 2]"^"\n"^
-                    "mov rbx, qword [rbx + 8 * "^ (string_of_int major)^"]"^"\n"^
-                    "mov qword [rbx + 8 * "^ (string_of_int minor)^"], rax"^"\n"^
+                    (generate consts fvars env_size z)^
+                    "mov rbx, qword [rbp + WORD_SIZE * 2]"^"\n"^
+                    "mov rbx, qword [rbx + WORD_SIZE * "^ (string_of_int major)^"]"^"\n"^
+                    "mov qword [rbx + WORD_SIZE * "^ (string_of_int minor)^"], rax"^"\n"^
                     "mov rax, SOB_VOID_ADDRESS"^"\n"
     | Var'(VarFree(v)) -> 
                     let addr = find_fvar v fvars in
@@ -250,40 +320,43 @@ let primitive_names_to_labels =
                     else "mov rax, qword [fvar_tbl+"^(string_of_int addr)^"]\n" 
 
     | BoxGet'(v)->
-                    (generate consts fvars (Var' v))^
+                    (generate consts fvars env_size (Var' v))^
                     "mov rax, qword [rax]"^"\n"
 
     | BoxSet'(v,eps)->
-                    (generate consts fvars eps)^
+                    (generate consts fvars env_size eps)^
                     "push rax"^"\n"^
-                    (generate consts fvars (Var' v))^
+                    (generate consts fvars env_size (Var' v))^
                     "pop qword [rax]"^"\n"^
                     "mov rax, SOB_VOID_ADDRESS"^"\n"
     |Or' (lst) ->     let exit_label = "Lexit" ^ (string_of_int (new_id())) in
                       let last_arg =  (List.nth lst ((List.length lst) - 1)) in
                       (String.concat "" (List.map 
-                        (fun epsilon -> (generate consts fvars epsilon) ^ 
+                        (fun epsilon -> (generate consts fvars env_size epsilon) ^ 
                                         "cmp rax, SOB_FALSE_ADDRESS\n"^
                                         "jne "^exit_label^"\n" ) (List.rev(List.tl(List.rev lst))) ))^
-                                        (generate consts fvars last_arg) ^
+                                        (generate consts fvars env_size last_arg) ^
                                         exit_label ^":\n"
     | Set'((VarFree(v)),eps) ->   
               let addr = find_fvar v fvars in
                       if (addr = -1)  then raise X_syntax_error 
-                      else (generate consts fvars eps)^
+                      else (generate consts fvars env_size eps)^
                       "mov qword [fvar_tbl + "^(string_of_int addr)^"], rax \n"^
                       "mov rax, SOB_VOID_ADDRESS"^"\n" 
     | Def'((VarFree(v)),eps) ->   
     let addr = find_fvar v fvars in
             if (addr = -1)  then raise X_syntax_error 
-            else (generate consts fvars eps)^
+            else (generate consts fvars env_size eps)^
             "mov qword [fvar_tbl + "^(string_of_int addr)^"], rax \n"^
             "mov rax, SOB_VOID_ADDRESS"^"\n" 
-
-    |_ ->  raise X_this_should_not_happen
-
-
-
-                                                          ;;
+    | LambdaSimple'(x,body)-> let id=(string_of_int (new_id())) in
+                              let lambda_body=(generate consts fvars (env_size+1) body) in
+                              (simple_lambda (string_of_int env_size) id lambda_body)
+    | Box' (VarParam (x, minor))->
+            "MALLOC rbx, WORD_SIZE"^"\n"^
+            (generate consts fvars env_size (Var'(VarParam (x,minor))))^
+            "mov qword [rbx] , rax
+            mov rax, rbx "^"\n" 
+    |_ ->  raise X_this_should_not_happen;;
 end;;
 

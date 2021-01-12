@@ -86,6 +86,7 @@ main:
     ;; (which a is a macro for 0) so that returning
     ;; from the top level (which SHOULD NOT HAPPEN
     ;; AND IS A BUG) will cause a segfault.
+    push SOB_NIL_ADDRESS  ; oded and raviv addition, the magic argument for the dummy frame as well 
     push 0                ; argument count
     push SOB_NIL_ADDRESS  ; lexical environment address
     push T_UNDEFINED      ; return address
@@ -108,7 +109,7 @@ let clean_exit =
   ";;; Clean up the dummy frame, set the exit status to 0 (\"success\"), 
    ;;; and return from main
    pop rbp
-   add rsp, 3*8
+   add rsp, 4*8
    mov rax, 0
 
    ret";;
@@ -146,7 +147,7 @@ try
   let fvars_tbl = Code_Gen.make_fvars_tbl asts in  
 
   (* Generate assembly code for each ast and merge them all into a single string *)
-  let generate = Code_Gen.generate consts_tbl fvars_tbl in 
+  let generate = Code_Gen.generate consts_tbl fvars_tbl 0 in 
   let code_fragment = String.concat "\n\n"
                         (List.map
                            (fun ast -> (generate ast) ^ "\n\tcall write_sob_if_not_void")
