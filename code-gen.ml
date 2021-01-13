@@ -1,5 +1,7 @@
 #use "semantic-analyser.ml";;
 
+exception X_not_yet_implemented_code_gen;;
+
 (* This module is here for you convenience only!
    You are not required to use it.
    you are allowed to change it. *)
@@ -349,7 +351,7 @@ let simple_lambda env_size id lambda_body =
             else (generate consts fvars env_size eps)^
             "mov qword [fvar_tbl + "^(string_of_int addr)^"], rax \n"^
             "mov rax, SOB_VOID_ADDRESS"^"\n" 
-    | LambdaSimple'(x,body)-> let id=(string_of_int (new_id())) in
+    | LambdaSimple'(_,body)-> let id=(string_of_int (new_id())) in
                               let lambda_body=(generate consts fvars (env_size+1) body) in
                               (simple_lambda (string_of_int env_size) id lambda_body)
     | Box' (VarParam (x, minor))->
@@ -357,6 +359,17 @@ let simple_lambda env_size id lambda_body =
             (generate consts fvars env_size (Var'(VarParam (x,minor))))^
             "mov qword [rbx] , rax
             mov rax, rbx "^"\n" 
+    | Applic'(proc ,args) ->raise X_not_yet_implemented_code_gen
+    | ApplicTP'(proc ,args) -> raise X_not_yet_implemented_code_gen
+    | LambdaOpt'( _,_,body)-> raise X_not_yet_implemented_code_gen
+
+    |_ ->  raise X_not_yet_implemented_code_gen
+
     |_ ->  raise X_this_should_not_happen;;
 end;;
 
+(* type expr' =
+  | LambdaSimple' of string list * expr'
+  | LambdaOpt' of string list * string * expr'
+  | Applic' of expr' * (expr' list)
+  | ApplicTP' of expr' * (expr' list);; *)

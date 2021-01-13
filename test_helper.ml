@@ -15,7 +15,41 @@ let generate_watch  program = let asts= till_3 program in
                             let fvars_tbl= free_watch program in 
                             let consts_tbl =  const_watch program  in 
                              List.map (Code_Gen.generate consts_tbl fvars_tbl 0) asts;;
-(* 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(* (* 
    Auxiliary function to load the contents of a file into a string in memory.
    Note: exceptions are not handled here, and are expected to be handled 
    by the caller. We already took care of this in main code block below.
@@ -172,4 +206,4 @@ try
                     "\n" ^ Prims.procs)
 
 (* raise an exception if the input file isn't found *)
-with Invalid_argument(x) -> raise X_missing_input_file;;
+with Invalid_argument(x) -> raise X_missing_input_file;; *)
