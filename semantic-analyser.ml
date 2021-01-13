@@ -70,7 +70,7 @@ end;;
 module Semantics : SEMANTICS = struct
 
 let rec contains_symbol lst symbol index =
-match lst with 
+  match lst with 
    |[]->(-1)
    |hd::tl->(if ((compare hd symbol)==0) then index else (contains_symbol tl symbol (index+1)))
 
@@ -97,32 +97,32 @@ let get_var name params_list env_list=
               then Var'(VarBound(name,index_of_list_in_env,(index_of_item_in_list_contains_symbol env_list name)))
               else Var'(VarFree(name)));;
 let rec annotate_lexical_addresses_recursive expr params_list env_list= match expr with 
-| Const(x)->Const'(x)
-| Var(name)->(get_var name params_list env_list)
-| If (test,dit,dif)-> If' ((annotate_lexical_addresses_recursive test params_list env_list),(annotate_lexical_addresses_recursive dit params_list env_list),(annotate_lexical_addresses_recursive dif params_list env_list))
-| Seq (lst) ->Seq'( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst)
-| Set (vari,expr) -> Set' ((match (annotate_lexical_addresses_recursive vari params_list env_list) with
-                          |Var'(x) -> x
-                          |_-> raise X_syntax_error) ,(annotate_lexical_addresses_recursive expr params_list env_list ))
-| Def (var1,val1) -> Def' ((match (annotate_lexical_addresses_recursive var1 params_list env_list) with
-                          |Var'(x) -> x
-                          |_-> raise X_syntax_error),(annotate_lexical_addresses_recursive val1 params_list env_list ))
-| Or (lst) -> Or' ( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst)
-| LambdaSimple (params,body)-> 
-                              let new_env = params_list::env_list in
-                              let param_lst = params in
-                              let new_body = (annotate_lexical_addresses_recursive body param_lst new_env)in
-                              LambdaSimple' (params,new_body)
-|LambdaOpt (params,optinalParam,body)->
-                                      let new_env = params_list::env_list in
-                                      let param_lst = (List.append params [optinalParam]) in
-                                      let new_body = (annotate_lexical_addresses_recursive body param_lst new_env)in
-                                      LambdaOpt' (params,optinalParam,new_body)
-| Applic (func,lst) -> Applic' ((annotate_lexical_addresses_recursive func params_list env_list ), ( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst))
-;;
+  | Const(x)->Const'(x)
+  | Var(name)->(get_var name params_list env_list)
+  | If (test,dit,dif)-> If' ((annotate_lexical_addresses_recursive test params_list env_list),(annotate_lexical_addresses_recursive dit params_list env_list),(annotate_lexical_addresses_recursive dif params_list env_list))
+  | Seq (lst) ->Seq'( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst)
+  | Set (vari,expr) -> Set' ((match (annotate_lexical_addresses_recursive vari params_list env_list) with
+                            |Var'(x) -> x
+                            |_-> raise X_syntax_error) ,(annotate_lexical_addresses_recursive expr params_list env_list ))
+  | Def (var1,val1) -> Def' ((match (annotate_lexical_addresses_recursive var1 params_list env_list) with
+                            |Var'(x) -> x
+                            |_-> raise X_syntax_error),(annotate_lexical_addresses_recursive val1 params_list env_list ))
+  | Or (lst) -> Or' ( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst)
+  | LambdaSimple (params,body)-> 
+                                let new_env = params_list::env_list in
+                                let param_lst = params in
+                                let new_body = (annotate_lexical_addresses_recursive body param_lst new_env)in
+                                LambdaSimple' (params,new_body)
+  |LambdaOpt (params,optinalParam,body)->
+                                        let new_env = params_list::env_list in
+                                        let param_lst = (List.append params [optinalParam]) in
+                                        let new_body = (annotate_lexical_addresses_recursive body param_lst new_env)in
+                                        LambdaOpt' (params,optinalParam,new_body)
+  | Applic (func,lst) -> Applic' ((annotate_lexical_addresses_recursive func params_list env_list ), ( List.map (fun exp -> (annotate_lexical_addresses_recursive exp params_list env_list )) lst))
+  ;;
 let annotate_lexical_addresses e =
-  (annotate_lexical_addresses_recursive e [] [])
-;;
+    (annotate_lexical_addresses_recursive e [] [])
+  ;;
 (*\\\\\\\\\\\\\\\\\\\\\\\tail-calls/////////////////////////////// *)
 let rec tail_call exp =
   match exp with 
@@ -139,10 +139,10 @@ let rec tail_call exp =
   | x -> x
 
 and make_TP = function
-|If'(test,dif,dit) -> If'((tail_call test),(make_TP (tail_call dif)),(make_TP (tail_call dit)))
-|Or' (lst) -> Or'(make_TP_last_element lst)
-|Applic'(proc,lst) -> Applic' ((tail_call proc),(List.map tail_call lst)) (*applicTP after arrow!!!!!*)
-|x -> tail_call x
+  |If'(test,dif,dit) -> If'((tail_call test),(make_TP (tail_call dif)),(make_TP (tail_call dit)))
+  |Or' (lst) -> Or'(make_TP_last_element lst)
+  |Applic'(proc,lst) -> Applic' ((tail_call proc),(List.map tail_call lst)) (*applicTP after arrow!!!!!*)
+  |x -> tail_call x
 
 and make_TP_last_element lst =
   let after_tail_lst = (List.map (fun x -> (tail_call x))) lst in
@@ -156,8 +156,8 @@ let get_var_param params var_p=
                                           Set'(VarParam(var_p, minor), Box'(VarParam(var_p,minor)));;
 let add_set_at_body body_expr params= 
   match body_expr with 
-|Seq'(lst) -> Seq' (List.append (List.map  (fun a->(get_var_param params a)) params) lst)
-|single_expr-> match params with 
+  |Seq'(lst) -> Seq' (List.append (List.map  (fun a->(get_var_param params a)) params) lst)
+  |single_expr-> match params with 
                 |hd::tl->Seq' (List.append (List.map  (fun a->(get_var_param params a)) params)  [single_expr])
                 |_->single_expr;;
 
@@ -173,7 +173,7 @@ let rec box_recursive e=
   | Or'(lst)-> Or'(List.map (fun x->(box_recursive x))lst)
   | Seq'(lst) -> Seq' (List.map box_recursive lst)
   | Set'(vari,exp) -> BoxSet' (vari, (box_recursive exp)) 
-  | Def'(vari,exp) -> Def' (vari, (tail_call exp))
+  | Def'(vari,exp) -> Def' (vari, (box_recursive exp))
   | Applic'(proc,lst) -> Applic'((box_recursive proc),(List.map (fun x -> (box_recursive x))lst))
   | Var'(VarParam (x,y)) ->  BoxGet'(VarParam (x,y))
   | Var'(VarBound (x,y,z))-> BoxGet'(VarBound (x,y,z))

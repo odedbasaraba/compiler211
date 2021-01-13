@@ -1,6 +1,7 @@
 #use "semantic-analyser.ml";;
 
 exception X_not_yet_implemented_code_gen;;
+exception X_debug;;
 
 (* This module is here for you convenience only!
    You are not required to use it.
@@ -97,7 +98,6 @@ module Code_Gen : CODE_GEN = struct
       | Sexpr(Number(Fraction(x,y))) -> ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_RATIONAL(" ^ (string_of_int x) ^ ", " ^ (string_of_int y) ^ ")  ;"^(string_of_int offset))  ),(offset+17))
       | Sexpr(Number(Float(x))) ->  ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_FLOAT(" ^ (string_of_float x) ^ ")")) ,(offset+9) )
       | Sexpr(Pair(x,y)) -> let newtbl_and_offset = (const_Handler (Sexpr x) const_tbl offset )  in 
-                              let add_of_x = offset in (* just change the name in order to have clean code *)
                                 (match newtbl_and_offset with 
                                 |(tbl,new_offset)-> let newtbl_and_offset = (const_Handler (Sexpr y) tbl new_offset ) in
                                                     (match newtbl_and_offset with 
@@ -211,6 +211,13 @@ let simple_lambda env_size id lambda_body =
   push rcx
   push rdx
   push rsi
+  mov rbx, "^env_size ^"
+  cmp rbx,0
+  jne not_empty"^id^"
+  mov rbx, SOB_NIL_ADDRESS
+  MAKE_CLOSURE(rax, rbx, Lcode" ^ id  ^ ")
+  jmp after_closure"^id^"
+  not_empty"^id^":
   MALLOC rax, WORD_SIZE*" ^env_size^ "; allocate new enviorment \n" ^
   "mov rbx,[rbp +2 *WORD_SIZE]
   mov rcx,0 
@@ -234,7 +241,7 @@ let simple_lambda env_size id lambda_body =
   mov rcx,0
   copy_args"^id^":
   cmp rcx,rbx
-  je finish_env_copy" ^ id ^ "\n" ^"
+  je finish_copy_args" ^ id ^ "\n" ^"
   mov rsi, PVAR(rcx)
   mov [rdx + rcx *WORD_SIZE ],rsi
   inc rcx
@@ -244,6 +251,7 @@ let simple_lambda env_size id lambda_body =
   mov rbx,rax
   MAKE_CLOSURE(rax, rbx, Lcode" ^ id  ^ ")\n" ^
   "
+  after_closure"^id^":
   pop rsi
   pop rdx
   pop rcx
@@ -270,9 +278,10 @@ let simple_lambda env_size id lambda_body =
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~GENERATE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 
+let working_on type_off= ";working on " ^ type_off ^"\n";;
+let finish_working_on type_off= ";finishing working on " ^ type_off ^"\n";;
 
-
-
+let wrap_for_debug body type_off= (working_on type_off) ^ body ^ (finish_working_on type_off);;
 
 
   let make_lazy_list initial next =
@@ -286,78 +295,78 @@ let simple_lambda env_size id lambda_body =
     match e with 
     | Const' (cns) ->  let addr = find_const_addr cns consts in
                     if (addr == -1) then raise X_syntax_error
-                    else "mov rax, const_tbl+" ^ (string_of_int addr) ^" \n"
+                    else (wrap_for_debug ("mov rax, const_tbl+" ^ (string_of_int addr) ^" \n") "const")
     | Seq' (exps)-> 
-      (String.concat "\n" (List.map (fun eps-> (generate consts fvars env_size eps)) exps)) (*check if need to seperate with \n*) 
+    (wrap_for_debug  (String.concat "\n" (List.map (fun eps-> (generate consts fvars env_size eps)) exps)) "seq" ) (*check if need to seperate with \n*) 
     | If'  (test,dit,dif) ->
                            let id=(string_of_int (new_id())) in
                             (generate consts fvars env_size test)^
-                            "cmp rax, SOB_FALSE_ADDRESS\n"^
+                            (wrap_for_debug  ("cmp rax, SOB_FALSE_ADDRESS\n"^
                             "je Lelse" ^ id ^ "\n"^
                             (generate consts fvars env_size dit)^
                             "jmp Lexit" ^ id ^ "\n"^
                             "Lelse" ^ id ^ ":\n"^
                             (generate consts fvars env_size dif)^
-                            "Lexit" ^ id ^ ":\n"
+                            "Lexit" ^ id ^ ":\n") "if")
     | Var'(VarParam(_, minor))->
-                    "mov rax, qword [rbp + WORD_SIZE * (4 + "^(string_of_int minor)^")]"^" \n"
+              (wrap_for_debug("mov rax, qword [rbp + WORD_SIZE * (4 + "^(string_of_int minor)^")]"^" \n") "Var param" )
     | Set'((VarParam(_, minor)),eps) ->
-                    (generate consts fvars env_size eps)^
+    (wrap_for_debug((generate consts fvars env_size eps)^
                     "mov qword [rbp + WORD_SIZE * (4 + "^(string_of_int minor)^")], rax"^"\n"^
-                    "mov rax, SOB_VOID_ADDRESS"^"\n"
+                    "mov rax, SOB_VOID_ADDRESS"^"\n") "Set VarParam" )
     | Var'(VarBound(_, major, minor)) ->
-                    "mov rax, qword [rbp + WORD_SIZE * 2]"^"\n"^
-                    "mov rax, qword [rax + WORD_SIZE * " ^ (string_of_int major)^"]"^"\n" ^
-                    "mov rax, qword [rax + WORD_SIZE * " ^(string_of_int minor)^"]"^"\n" 
+    (wrap_for_debug ("mov rax, qword [rbp + WORD_SIZE * 2]"^"\n"^
+                    "mov rax, qword [rax + WORD_SIZE * " ^ (string_of_int major )^"]"^"\n" ^
+                    "mov rax, qword [rax + WORD_SIZE * " ^(string_of_int minor)^"]"^"\n") "VarBound")
     |Set'((VarBound(_,major, minor)),z)->
-                    (generate consts fvars env_size z)^
+                   (wrap_for_debug( (generate consts fvars env_size z)^
                     "mov rbx, qword [rbp + WORD_SIZE * 2]"^"\n"^
                     "mov rbx, qword [rbx + WORD_SIZE * "^ (string_of_int major)^"]"^"\n"^
                     "mov qword [rbx + WORD_SIZE * "^ (string_of_int minor)^"], rax"^"\n"^
-                    "mov rax, SOB_VOID_ADDRESS"^"\n"
+                    "mov rax, SOB_VOID_ADDRESS"^"\n") "Set VarBound" )
     | Var'(VarFree(v)) -> 
                     let addr = find_fvar v fvars in
                     if (addr = -1) then raise X_syntax_error
-                    else "mov rax, qword [fvar_tbl+"^(string_of_int addr)^"]\n" 
+                    else  (wrap_for_debug ("mov rax, qword [fvar_tbl+"^(string_of_int addr)^"]\n") "VarFree") 
 
     | BoxGet'(v)->
-                    (generate consts fvars env_size (Var' v))^
-                    "mov rax, qword [rax]"^"\n"
+                    (wrap_for_debug((generate consts fvars env_size (Var' v))^
+                    "mov rax, qword [rax]"^"\n") "BoxGet")
 
     | BoxSet'(v,eps)->
-                    (generate consts fvars env_size eps)^
+                    (wrap_for_debug((generate consts fvars env_size eps)^
                     "push rax"^"\n"^
                     (generate consts fvars env_size (Var' v))^
                     "pop qword [rax]"^"\n"^
-                    "mov rax, SOB_VOID_ADDRESS"^"\n"
+                    "mov rax, SOB_VOID_ADDRESS"^"\n") "BoxSet" )
     |Or' (lst) ->     let exit_label = "Lexit" ^ (string_of_int (new_id())) in
                       let last_arg =  (List.nth lst ((List.length lst) - 1)) in
-                      (String.concat "" (List.map 
+                      (wrap_for_debug((String.concat "" (List.map 
                         (fun epsilon -> (generate consts fvars env_size epsilon) ^ 
                                         "cmp rax, SOB_FALSE_ADDRESS\n"^
                                         "jne "^exit_label^"\n" ) (List.rev(List.tl(List.rev lst))) ))^
                                         (generate consts fvars env_size last_arg) ^
-                                        exit_label ^":\n"
+                                        exit_label ^":\n") "Or" )
     | Set'((VarFree(v)),eps) ->   
               let addr = find_fvar v fvars in
                       if (addr = -1)  then raise X_syntax_error 
-                      else (generate consts fvars env_size eps)^
+                      else (wrap_for_debug((generate consts fvars env_size eps)^
                       "mov qword [fvar_tbl + "^(string_of_int addr)^"], rax \n"^
-                      "mov rax, SOB_VOID_ADDRESS"^"\n" 
+                      "mov rax, SOB_VOID_ADDRESS"^"\n" ) "Set VarFree" )
     | Def'((VarFree(v)),eps) ->   
     let addr = find_fvar v fvars in
             if (addr = -1)  then raise X_syntax_error 
-            else (generate consts fvars env_size eps)^
+            else (wrap_for_debug((generate consts fvars env_size eps)^
             "mov qword [fvar_tbl + "^(string_of_int addr)^"], rax \n"^
-            "mov rax, SOB_VOID_ADDRESS"^"\n" 
+            "mov rax, SOB_VOID_ADDRESS"^"\n") "Def") 
     | LambdaSimple'(_,body)-> let id=(string_of_int (new_id())) in
                               let lambda_body=(generate consts fvars (env_size+1) body) in
-                              (simple_lambda (string_of_int env_size) id lambda_body)
+                              (wrap_for_debug(simple_lambda (string_of_int env_size) id lambda_body) "LambdaSimple")
     | Box' (VarParam (x, minor))->
-            "MALLOC rbx, WORD_SIZE"^"\n"^
+            (wrap_for_debug("MALLOC rbx, WORD_SIZE"^"\n"^
             (generate consts fvars env_size (Var'(VarParam (x,minor))))^
             "mov qword [rbx] , rax"^"\n"^
-            "mov rax, rbx "^"\n" 
+            "mov rax, rbx "^"\n" ) "Box")
     | Applic'(proc ,args) ->
                   (* let keep_rbx= "push rbx\n" in *)
                   let magic = "push SOB_NIL_ADDRESS \n" in
@@ -365,7 +374,7 @@ let simple_lambda env_size id lambda_body =
                                   ^ "\n"^ "mov rbx, "^ (string_of_int (List.length args)) ^"\n" ^
                                   "push rbx\n"
                                   in
-                                 (* keep_rbx ^*) magic ^ args_push ^ (generate consts fvars env_size proc) ^
+                                 (wrap_for_debug((* keep_rbx ^*) magic ^ args_push ^ (generate consts fvars env_size proc) ^
                                   (* add "jne bad_exit" after comparing*)
                                   "cmp qword[rax + 0 * WORD_SIZE], T_CLOSURE
                                   CLOSURE_ENV rbx, rax
@@ -377,7 +386,8 @@ let simple_lambda env_size id lambda_body =
                                   inc rbx ; add 1 for the magic to clean
                                   shl rbx, 3
                                   add rsp, rbx ; delete args and magic \n
-                                          ;                   pop rbx ; restore rbx value"
+                                          ;                   pop rbx ; restore rbx value\n" )
+                                           "Applic")
     | ApplicTP'(proc ,args) -> raise X_not_yet_implemented_code_gen
     | LambdaOpt'( _,_,body)-> raise X_not_yet_implemented_code_gen
     
