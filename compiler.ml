@@ -148,10 +148,10 @@ try
 
   (* Generate assembly code for each ast and merge them all into a single string *)
   let generate = Code_Gen.generate consts_tbl fvars_tbl 0 in 
-  let code_fragment = String.concat "\n\n"
+  let code_fragment = (String.concat "\n\n"
                         (List.map
                            (fun ast -> (generate ast) ^ "\n\tcall write_sob_if_not_void")
-                           asts) in
+                           asts))^"\n\n\n   " in
 
   (* merge everything into a single large string and print it out *)
   print_string ((make_prologue consts_tbl fvars_tbl)  ^ 

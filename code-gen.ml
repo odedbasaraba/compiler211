@@ -94,25 +94,24 @@ module Code_Gen : CODE_GEN = struct
     (
       match const with
       | Sexpr(Char x)-> ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_CHAR("^(string_of_int(Char.code x))^")")),(offset +2))
-      | Sexpr(Number(Fraction(x,y))) -> ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_RATIONAL(" ^ (string_of_int x) ^ ", " ^ (string_of_int y) ^ ")")  ),(offset+17))
+      | Sexpr(Number(Fraction(x,y))) -> ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_RATIONAL(" ^ (string_of_int x) ^ ", " ^ (string_of_int y) ^ ")  ;"^(string_of_int offset))  ),(offset+17))
       | Sexpr(Number(Float(x))) ->  ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_FLOAT(" ^ (string_of_float x) ^ ")")) ,(offset+9) )
       | Sexpr(Pair(x,y)) -> let newtbl_and_offset = (const_Handler (Sexpr x) const_tbl offset )  in 
                               let add_of_x = offset in (* just change the name in order to have clean code *)
                                 (match newtbl_and_offset with 
-                                |(tbl,add_of_y)-> let newtbl_and_offset = (const_Handler (Sexpr y) tbl add_of_y ) in
+                                |(tbl,new_offset)-> let newtbl_and_offset = (const_Handler (Sexpr y) tbl new_offset ) in
                                                     (match newtbl_and_offset with 
                                                     |(tbl,offset_of_pair) -> ((add_to_const_table const tbl offset_of_pair ("MAKE_LITERAL_PAIR("
-                                                      ^ (string_of_int add_of_x) ^ ", " ^ (string_of_int add_of_y)^ ")")),(offset_of_pair+17) )
+                                                      ^ (string_of_int (find_const_addr (Sexpr x) tbl)) ^ "+const_tbl , const_tbl+" ^ (string_of_int (find_const_addr (Sexpr y) tbl))^ ")  ;"^(string_of_int offset_of_pair))),(offset_of_pair+17) )
                                 ))
       | Sexpr(Bool x)-> (const_tbl,offset) 
       | Sexpr (Nil) ->   (const_tbl,offset)
       | Void ->   (const_tbl,offset)                      
       | Sexpr(String x) -> ((add_to_const_table const const_tbl offset ("MAKE_LITERAL_STRING "^(make_string_char_list x)^" ")), ((String.length x)+9+offset))
       | Sexpr(Symbol x) -> let newtbl_and_offset = (const_Handler (Sexpr(String x)) const_tbl offset) in 
-                              let add_of_x= offset in
                               match newtbl_and_offset with 
                               | (tbl,symbol_offset)->  ((add_to_const_table const tbl symbol_offset ("MAKE_LITERAL_SYMBOL(const_tbl+"
-                            ^ (string_of_int add_of_x) ^ ")") ),(symbol_offset+ 9))
+                            ^ (string_of_int (find_const_addr (Sexpr(String x)) tbl)) ^ ")") ),(symbol_offset+ 9))
                           
     
     
@@ -249,7 +248,7 @@ let simple_lambda env_size id lambda_body =
   pop rdx
   pop rcx
   pop rbx
-  jmp Lcont"^id ^ "\n" ^ 
+  jmp Lcont"^id ^ "\n" ^   
   "Lcode"^id^":
     push rbp
     mov rbp,rsp \n" ^
@@ -304,7 +303,7 @@ let simple_lambda env_size id lambda_body =
                     "mov rax, qword [rbp + WORD_SIZE * (4 + "^(string_of_int minor)^")]"^" \n"
     | Set'((VarParam(_, minor)),eps) ->
                     (generate consts fvars env_size eps)^
-                    "mov qword [rbp + WORD_SIZE ∗ (4 +"^(string_of_int minor)^")], rax"^"\n"^
+                    "mov qword [rbp + WORD_SIZE * (4 + "^(string_of_int minor)^")], rax"^"\n"^
                     "mov rax, SOB_VOID_ADDRESS"^"\n"
     | Var'(VarBound(_, major, minor)) ->
                     "mov rax, qword [rbp + WORD_SIZE * 2]"^"\n"^
@@ -357,19 +356,33 @@ let simple_lambda env_size id lambda_body =
     | Box' (VarParam (x, minor))->
             "MALLOC rbx, WORD_SIZE"^"\n"^
             (generate consts fvars env_size (Var'(VarParam (x,minor))))^
-            "mov qword [rbx] , rax
-            mov rax, rbx "^"\n" 
-    | Applic'(proc ,args) ->raise X_not_yet_implemented_code_gen
+            "mov qword [rbx] , rax"^"\n"^
+            "mov rax, rbx "^"\n" 
+    | Applic'(proc ,args) ->
+                  (* let keep_rbx= "push rbx\n" in *)
+                  let magic = "push SOB_NIL_ADDRESS \n" in
+                  let args_push=(String.concat "\n" (List.map (fun arg-> (generate consts fvars env_size arg)^ "push rax") (List.rev args))) 
+                                  ^ "\n"^ "mov rbx, "^ (string_of_int (List.length args)) ^"\n" ^
+                                  "push rbx\n"
+                                  in
+                                 (* keep_rbx ^*) magic ^ args_push ^ (generate consts fvars env_size proc) ^
+                                  (* add "jne bad_exit" after comparing*)
+                                  "cmp qword[rax + 0 * WORD_SIZE], T_CLOSURE
+                                  CLOSURE_ENV rbx, rax
+                                  push rbx
+                                  CLOSURE_CODE rbx, rax
+                                  call rbx
+                                  add rsp, 8 ; delete env from stack
+                                  pop rbx ; keep arg_count in rbx
+                                  inc rbx ; add 1 for the magic to clean
+                                  shl rbx, 3
+                                  add rsp, rbx ; delete args and magic \n
+                                          ;                   pop rbx ; restore rbx value"
     | ApplicTP'(proc ,args) -> raise X_not_yet_implemented_code_gen
     | LambdaOpt'( _,_,body)-> raise X_not_yet_implemented_code_gen
-
+    
     |_ ->  raise X_not_yet_implemented_code_gen
 
-    |_ ->  raise X_this_should_not_happen;;
+
 end;;
 
-(* type expr' =
-  | LambdaSimple' of string list * expr'
-  | LambdaOpt' of string list * string * expr'
-  | Applic' of expr' * (expr' list)
-  | ApplicTP' of expr' * (expr' list);; *)

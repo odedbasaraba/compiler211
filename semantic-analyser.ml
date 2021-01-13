@@ -160,11 +160,15 @@ let add_set_at_body body_expr params=
 |single_expr-> match params with 
                 |hd::tl->Seq' (List.append (List.map  (fun a->(get_var_param params a)) params)  [single_expr])
                 |_->single_expr;;
-let rec box_recursive e=
 
+
+
+
+let rec box_recursive e=
+  
   match e with 
-  | LambdaSimple'(x,body)->LambdaSimple'(x,(box_recursive(add_set_at_body body x)))
-  | LambdaOpt'(x,y,body) -> LambdaOpt' (x,y,(box_recursive(add_set_at_body body (List.append x [y]))))
+  | LambdaSimple'(x,body)->LambdaSimple'(x,(add_set_at_body (box_recursive body) x))
+  | LambdaOpt'(x,y,body) -> LambdaOpt' (x,y,(add_set_at_body (box_recursive body) (List.append x [y])))
   | If'(test, dit, dif)-> If'((box_recursive test),(box_recursive dit),(box_recursive dif))
   | Or'(lst)-> Or'(List.map (fun x->(box_recursive x))lst)
   | Seq'(lst) -> Seq' (List.map box_recursive lst)
