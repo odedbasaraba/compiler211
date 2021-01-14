@@ -1,7 +1,1 @@
-(letrec ((fact (lambda (n)
-                       (or (= 0 n)
-                           (is-odd? (sub1 n)))))
-           (is-odd? (lambda (n)
-                      (and (not (= 0 n))
-                           (is-even? (sub1 n))))))
-    (is-odd? 11))
+((lambda () ((lambda () 5))))

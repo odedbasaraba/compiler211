@@ -141,7 +141,7 @@ let rec tail_call exp =
 and make_TP = function
   |If'(test,dif,dit) -> If'((tail_call test),(make_TP (tail_call dif)),(make_TP (tail_call dit)))
   |Or' (lst) -> Or'(make_TP_last_element lst)
-  |Applic'(proc,lst) -> Applic' ((tail_call proc),(List.map tail_call lst)) (*applicTP after arrow!!!!!*)
+  |Applic'(proc,lst) -> ApplicTP' ((tail_call proc),(List.map tail_call lst)) (*applicTP after arrow!!!!!*)
   |x -> tail_call x
 
 and make_TP_last_element lst =
@@ -172,6 +172,7 @@ let rec box_recursive e=
   | If'(test, dit, dif)-> If'((box_recursive test),(box_recursive dit),(box_recursive dif))
   | Or'(lst)-> Or'(List.map (fun x->(box_recursive x))lst)
   | Seq'(lst) -> Seq' (List.map box_recursive lst)
+  | Set'(VarFree (var_free),exp) ->  Set'(VarFree (var_free),exp)
   | Set'(vari,exp) -> BoxSet' (vari, (box_recursive exp)) 
   | Def'(vari,exp) -> Def' (vari, (box_recursive exp))
   | Applic'(proc,lst) -> Applic'((box_recursive proc),(List.map (fun x -> (box_recursive x))lst))

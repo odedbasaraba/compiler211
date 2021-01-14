@@ -376,7 +376,7 @@ let wrap_for_debug body type_off= (working_on type_off) ^ body ^ (finish_working
                                   in
                                  (wrap_for_debug((* keep_rbx ^*) magic ^ args_push ^ (generate consts fvars env_size proc) ^
                                   (* add "jne bad_exit" after comparing*)
-                                  "cmp qword[rax + 0 * WORD_SIZE], T_CLOSURE
+                                  "cmp qword[rax + (0 * WORD_SIZE)], T_CLOSURE
                                   CLOSURE_ENV rbx, rax
                                   push rbx
                                   CLOSURE_CODE rbx, rax
@@ -388,7 +388,62 @@ let wrap_for_debug body type_off= (working_on type_off) ^ body ^ (finish_working
                                   add rsp, rbx ; delete args and magic \n
                                           ;                   pop rbx ; restore rbx value\n" )
                                            "Applic")
-    | ApplicTP'(proc ,args) -> raise X_not_yet_implemented_code_gen
+    | ApplicTP'(proc ,args) ->  
+                          let id=(string_of_int (new_id())) in
+                          let magic = "push SOB_NIL_ADDRESS \n" in
+                          let args_push=(String.concat "\n" (List.map (fun arg-> (generate consts fvars env_size arg)^ "push rax") (List.rev args))) 
+                                          ^ "\n"^ "mov rbx, "^ (string_of_int (List.length args)) ^"\n" ^
+                                          "push rbx\n"
+                                          in
+                                          (wrap_for_debug((* keep_rbx ^*) magic ^ args_push ^ (generate consts fvars env_size proc) ^
+                                  (* add "jne bad_exit" after comparing*)
+                                  "cmp qword[rax + (0 * WORD_SIZE)], T_CLOSURE
+                                  CLOSURE_ENV rbx, rax
+                                  push rbx
+                                  push qword[rbp+(1 * WORD_SIZE)]
+                                  
+                                  ;put in rbx (register 1) address of top of stack to override
+                                  lea rbx,[rbp + (3 * WORD_SIZE)]
+                                  mov rcx,[rbx]
+                                  add rcx,1 ; for the magic
+                                  shl rcx,3
+                                  add rbx,rcx
+
+                                  ;put in rcx (register 2) address of top of stack that overrides
+                                  mov rcx, "^(string_of_int (List.length args))^"
+                                  add rcx,3
+                                  shl rcx, 3
+                                  add rcx,rsp
+
+                                  ;put in rdx (register 3)num of new args
+                                  mov rdx,"^(string_of_int (List.length args))^"
+                                
+
+                                  ;put in rsi (register 4) old rbp adress
+                                  mov rsi,[rbp]
+
+                                  copy_loop"^id^":
+                                  cmp rdx,0
+                                  je copy_env_and_ret_address"^id^"
+                                  push qword[rcx]
+                                  pop qword[rbx]
+                                  sub rbx,WORD_SIZE
+                                  sub rcx,WORD_SIZE
+                                  sub rdx,1
+                                  jmp copy_loop"^id^"
+
+                                  copy_env_and_ret_address"^id^":
+                                  push qword[rcx]
+                                  pop qword[rbx]
+                                  sub rbx,WORD_SIZE
+                                  sub rcx,WORD_SIZE
+                                  push qword[rcx]
+                                  pop qword[rbx]  
+                                  mov rbp,rsi
+                                  CLOSURE_CODE rbx, rax
+                                  jmp rbx
+                                  " )
+                                           "ApplicTP")
     | LambdaOpt'( _,_,body)-> raise X_not_yet_implemented_code_gen
     
     |_ ->  raise X_not_yet_implemented_code_gen
