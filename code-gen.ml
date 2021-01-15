@@ -370,6 +370,7 @@ let wrap_for_debug body type_off= (working_on type_off) ^ body ^ (finish_working
             "mov qword [rbx] , rax"^"\n"^
             "mov rax, rbx "^"\n" ) "Box")
     | Applic'(proc ,args) ->
+                  let id=(string_of_int (new_id())) in
                   (* let keep_rbx= "push rbx\n" in *)
                   let magic = "push SOB_NIL_ADDRESS \n" in
                   let args_push=(String.concat "\n" (List.map (fun arg-> (generate consts fvars env_size arg)^ "push rax") (List.rev args))) 
@@ -379,6 +380,10 @@ let wrap_for_debug body type_off= (working_on type_off) ^ body ^ (finish_working
                                  (wrap_for_debug((* keep_rbx ^*) magic ^ args_push ^ (generate consts fvars env_size proc) ^
                                   (* add "jne bad_exit" after comparing*)
                                   "cmp qword[rax + (0 * WORD_SIZE)], T_CLOSURE
+                                  jne bad_exit"^id^ "
+                                  mov rax,1
+                                  int 0x80
+                                  bad_exit"^id^ ":
                                   CLOSURE_ENV rbx, rax
                                   push rbx
                                   CLOSURE_CODE rbx, rax
