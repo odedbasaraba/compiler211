@@ -22,6 +22,13 @@
 	mov %1, qword [%2+TYPE_SIZE]	
 %endmacro	
 
+
+%macro print_debug 0
+	push rax
+	call write_sob_if_not_void
+	pop rax
+%endmacro
+
 %define NUMERATOR SKIP_TYPE_TAG
 
 %macro DENOMINATOR 2

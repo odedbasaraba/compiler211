@@ -18,6 +18,8 @@ MAKE_VOID
 MAKE_NIL
 MAKE_LITERAL_BOOL (0)
 MAKE_LITERAL_BOOL (1)
+MAKE_LITERAL_RATIONAL(1, 1)  ;6
+MAKE_LITERAL_RATIONAL(2, 1)  ;23
 
 ;;; These macro definitions are required for the primitive
 ;;; definitions in the epilogue to work properly
@@ -174,17 +176,21 @@ finish_copy_args0:
   pop rbx
   jmp Lcont0
 Lcode0:
+
     push rbp
     mov rbp,rsp 
 ;working on seq
 ;working on Set VarParam
 ;working on Box
 MALLOC rbx, WORD_SIZE
+
 ;working on Var param
 mov rax, qword [rbp + WORD_SIZE * (4 + 0)] 
 ;finishing working on Var param
 mov qword [rbx] , rax
+
 mov rax, rbx 
+
 ;finishing working on Box
 mov qword [rbp + WORD_SIZE * (4 + 0)], rax
 mov rax, SOB_VOID_ADDRESS
@@ -195,6 +201,7 @@ mov rax, SOB_VOID_ADDRESS
 MALLOC rbx, WORD_SIZE
 ;working on Var param
 mov rax, qword [rbp + WORD_SIZE * (4 + 1)] 
+
 ;finishing working on Var param
 mov qword [rbx] , rax
 mov rax, rbx 
@@ -203,12 +210,92 @@ mov qword [rbp + WORD_SIZE * (4 + 1)], rax
 mov rax, SOB_VOID_ADDRESS
 ;finishing working on Set VarParam
 
-;working on BoxGet
+;working on Set VarParam
+;working on Box
+MALLOC rbx, WORD_SIZE
+;working on Var param
+mov rax, qword [rbp + WORD_SIZE * (4 + 2)] 
+                            
+
+;finishing working on Var param
+mov qword [rbx] , rax
+mov rax, rbx 
+
+;finishing working on Box
+mov qword [rbp + WORD_SIZE * (4 + 2)], rax
+mov rax, SOB_VOID_ADDRESS
+;finishing working on Set VarParam
+
+;working on ApplicTP
+push SOB_NIL_ADDRESS 
+;working on Var param
+mov rax, qword [rbp + WORD_SIZE * (4 + 2)] 
+
+
+;finishing working on Var param
+push rax 
+                                   
+                          
+;working on Var param
+mov rax, qword [rbp + WORD_SIZE * (4 + 1)] 
+;finishing working on Var param
+push rax 
+                                   
+                          
+mov rbx, 2
+push rbx
 ;working on Var param
 mov rax, qword [rbp + WORD_SIZE * (4 + 0)] 
+
 ;finishing working on Var param
-mov rax, qword [rax]
-;finishing working on BoxGet
+cmp qword[rax + (0 * WORD_SIZE)], T_CLOSURE
+
+                                  CLOSURE_ENV rbx, rax
+                                  push rbx
+                                  push qword[rbp+(1 * WORD_SIZE)]
+                                  
+                                  ;put in rbx (register 1) address of top of stack to override
+                                  lea rbx,[rbp + (3 * WORD_SIZE)]
+                                  mov rcx,[rbx]
+                                  add rcx,1 ; for the magic
+                                  shl rcx,3
+                                  add rbx,rcx
+
+                                  ;put in rcx (register 2) address of top of stack that overrides
+                                  mov rcx, 2
+                                  add rcx,3
+                                  shl rcx, 3
+                                  add rcx,rsp
+
+                                  ;put in rdx (register 3)num of new args
+                                  mov rdx,2
+                                  add rdx,2
+
+                                  ;put in rsi (register 4) old rbp adress
+                                  mov rsi,[rbp]
+
+                                  copy_loop1:
+                                  cmp rdx,0
+                                  je copy_env_and_ret_address1
+                                  push qword[rcx]
+                                  pop qword[rbx]
+                                  sub rbx,WORD_SIZE
+                                  sub rcx,WORD_SIZE
+                                  sub rdx,1
+                                  jmp copy_loop1
+
+                                  copy_env_and_ret_address1:
+                                  push qword[rcx]
+                                  pop qword[rbx]
+                                  sub rbx,WORD_SIZE
+                                  sub rcx,WORD_SIZE
+                                  push qword[rcx]
+                                  pop qword[rbx]  
+                                  mov rbp,rsi
+                                  mov rsp,rbx
+                                  CLOSURE_CODE rbx, rax
+                                  jmp rbx
+                                  ;finishing working on ApplicTP
 ;finishing working on seq
 
 leave
@@ -221,25 +308,41 @@ mov rax, SOB_VOID_ADDRESS
 
 	call write_sob_if_not_void
 
+;working on VarFree
+mov rax, qword [fvar_tbl+256]
+;finishing working on VarFree
+
+	call write_sob_if_not_void
+
 ;working on Applic
 push SOB_NIL_ADDRESS 
 ;working on const
-mov rax, const_tbl+2 
+mov rax, const_tbl+23 
 ;finishing working on const
 push rax
 ;working on const
-mov rax, const_tbl+4 
+mov rax, const_tbl+6 
 ;finishing working on const
 push rax
-mov rbx, 2
+;working on VarFree
+mov rax, qword [fvar_tbl+168]
+;finishing working on VarFree
+push rax
+mov rbx, 3
 push rbx
 ;working on VarFree
 mov rax, qword [fvar_tbl+256]
 ;finishing working on VarFree
 cmp qword[rax + (0 * WORD_SIZE)], T_CLOSURE
+                                  jne good2
+                                  mov rax,60
+                                  syscall
+                                  good2:
                                   CLOSURE_ENV rbx, rax
                                   push rbx
                                   CLOSURE_CODE rbx, rax
+                                                                    
+
                                   call rbx
                                   add rsp, 8 ; delete env from stack
                                   pop rbx ; keep arg_count in rbx
