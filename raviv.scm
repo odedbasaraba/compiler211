@@ -1,1 +1,2 @@
-((lambda (x) ((lambda (f a d) 5))1 x x)3)
+(define func (lambda (x y) x))
+(func #t #F)
