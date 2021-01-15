@@ -222,7 +222,9 @@ let simple_lambda env_size id lambda_body =
   "mov rbx,[rbp +2 *WORD_SIZE]
   mov rcx,0 
   env_copy" ^id^":
-  cmp rcx, " ^env_size^ "\n" ^
+  mov rsi,"^env_size^"
+  dec rsi
+  cmp rcx, rsi" ^ "\n" ^
   "je finish_env_copy" ^ id ^"\n"^
   "mov rdx, [rbx + rcx * WORD_SIZE]
   inc rcx
@@ -417,7 +419,7 @@ let wrap_for_debug body type_off= (working_on type_off) ^ body ^ (finish_working
 
                                   ;put in rdx (register 3)num of new args
                                   mov rdx,"^(string_of_int (List.length args))^"
-                                
+                                  add rdx,2
 
                                   ;put in rsi (register 4) old rbp adress
                                   mov rsi,[rbp]
@@ -440,6 +442,7 @@ let wrap_for_debug body type_off= (working_on type_off) ^ body ^ (finish_working
                                   push qword[rcx]
                                   pop qword[rbx]  
                                   mov rbp,rsi
+                                  mov rsp,rbx
                                   CLOSURE_CODE rbx, rax
                                   jmp rbx
                                   " )
