@@ -231,11 +231,13 @@ let simple_lambda env_size id lambda_body =
   mov [rax + rcx * WORD_SIZE], rdx
   jmp env_copy" ^id^"\n" ^ 
   "finish_env_copy" ^ id ^ ":
+
   mov rbx, [rbp + 3 * WORD_SIZE]
-  cmp rbx,0
-  jne allocate_args" ^ id ^ "\n"^
-  "mov rdx, SOB_NIL_ADDRESS
-  jmp finish_copy_args" ^ id ^ "\n"^
+  inc rbx,1 ; for the magic
+  ;cmp rbx,0
+  ;jne allocate_args" ^ id ^ "\n"^
+  ";mov rdx, SOB_NIL_ADDRESS
+  ;jmp finish_copy_args" ^ id ^ "\n"^
   "allocate_args" ^ id ^ ":
   shl rbx,3
   MALLOC rdx, rbx
@@ -265,16 +267,125 @@ let simple_lambda env_size id lambda_body =
     lambda_body ^"\n" ^
     "leave
     ret
-    Lcont" ^id ^ ":\n"
+    Lcont" ^id ^ ":\n"  ;;
 
 
 
+    let opt_lambda num_of_req_args env_size id lambda_body =
 
-  
-  
-  
+      "push rbx
+      push rcx
+      push rdx
+      push rsi
+      mov rbx, "^env_size ^"
+      cmp rbx,0
+      jne not_empty"^id^"
+      mov rbx, SOB_NIL_ADDRESS
+      MAKE_CLOSURE(rax, rbx, Lcode" ^ id  ^ ")
+      jmp after_closure"^id^"
+      not_empty"^id^":
+      MALLOC rax, WORD_SIZE*" ^env_size^ "; allocate new enviorment \n" ^
+      "mov rbx,[rbp +2 *WORD_SIZE]
+      mov rcx,0 
+      env_copy" ^id^":
+      mov rsi,"^env_size^"
+      dec rsi
+      cmp rcx, rsi" ^ "\n" ^
+      "je finish_env_copy" ^ id ^"\n"^
+      "mov rdx, [rbx + rcx * WORD_SIZE]
+      inc rcx
+      mov [rax + rcx * WORD_SIZE], rdx
+      jmp env_copy" ^id^"\n" ^ 
+      "finish_env_copy" ^ id ^ ":
+      mov rbx, [rbp + 3 * WORD_SIZE]
+      inc rbx ; for the magic
+      ;cmp rbx,0
+      ;jne allocate_args" ^ id ^ "\n"^
+      ";mov rdx, SOB_NIL_ADDRESS
+      ;jmp finish_copy_args" ^ id ^ "\n"^
+      "allocate_args" ^ id ^ ":
+      shl rbx,3
+      MALLOC rdx, rbx
+      shr rbx,3
+      mov rcx,0
+      copy_args"^id^":
+      cmp rcx,rbx
+      je finish_copy_args" ^ id ^ "\n" ^"
+      mov rsi, PVAR(rcx)
+      mov [rdx + rcx *WORD_SIZE ],rsi
+      inc rcx
+      jmp copy_args" ^ id ^ "\n" ^
+      "finish_copy_args" ^ id ^ ":
+      mov [rax + 0 * WORD_SIZE] , rdx ;place at envorment 0
+      mov rbx,rax
+      MAKE_CLOSURE(rax, rbx, Lcode" ^ id  ^ ")\n" ^
+      "
+      after_closure"^id^":
+      pop rsi
+      pop rdx
+      pop rcx
+      pop rbx
+      jmp Lcont"^id ^ "\n" ^  
+      
+      
+      "Lcode"^id^":
+          mov rbx,"^(string_of_int num_of_req_args)^" ; num of *mandatory* args
+          mov rcx,[rsp+(2*WORD_SIZE)] ; num of args that was entered 
+          cmp rbx,rcx
+          je continue_with_the_code"^id^"
+          mov rdx,rcx 
+          sub rdx,rbx ; make rdx = [x-y]
+          mov rsi,1  ; it will be for the loop
 
-  ;;
+
+        mov r12,2
+        add r12 ,rcx
+        shl r12,3
+        add r12,rsp ;will point to head 
+
+        mov r13,SOB_NIL_ADDRESS
+
+        loop"^id^":
+        cmp rsi,rdx
+        je after_ops"^id^"
+        mov r14, [r12]
+        MAKE_PAIR(r15,14,13)
+        mov r13,r15
+        mov r9,rcx
+        sub r9,rsi
+        add r9,2
+        shift_frame_by_one r12, r15 , r9
+        dec qword[rsp + (2*WORD_SIZE)]
+        jmp loop"^id^"
+
+
+        after_ops"^id^":
+        mov r14 ,[r12]
+        MAKE_PAIR(r15,14,13)
+        mov r13,r15
+        mov [r12], r13
+
+    
+
+
+          continue_with_the_code"^id^":
+          inc qword[rsp+2*WORD_SIZE] ; add one for arg count for the optinal argument
+          push rbp
+          mov rbp,rsp \n" ^
+        lambda_body ^"\n" ^
+        "leave
+        ret
+        Lcont" ^id ^ ":\n";;
+    
+      
+    
+    
+      
+      
+      
+    
+      
+    
 
 
 
@@ -299,7 +410,7 @@ let wrap_for_debug body type_off= (working_on type_off) ^ body ^ (finish_working
                     if (addr == -1) then raise X_syntax_error
                     else (wrap_for_debug ("mov rax, const_tbl+" ^ (string_of_int addr) ^" \n") "const")
     | Seq' (exps)-> 
-    (wrap_for_debug  (String.concat "\n" (List.map (fun eps-> (generate consts fvars env_size eps)) exps)) "seq" ) (*check if need to seperate with \n*) 
+      (wrap_for_debug  (String.concat "\n" (List.map (fun eps-> (generate consts fvars env_size eps)) exps)) "seq" ) (*check if need to seperate with \n*) 
     | If'  (test,dit,dif) ->
                            let id=(string_of_int (new_id())) in
                             (generate consts fvars env_size test)^
@@ -313,11 +424,11 @@ let wrap_for_debug body type_off= (working_on type_off) ^ body ^ (finish_working
     | Var'(VarParam(_, minor))->
               (wrap_for_debug("mov rax, qword [rbp + WORD_SIZE * (4 + "^(string_of_int minor)^")]"^" \n") "Var param" )
     | Set'((VarParam(_, minor)),eps) ->
-    (wrap_for_debug((generate consts fvars env_size eps)^
+      (wrap_for_debug((generate consts fvars env_size eps)^
                     "mov qword [rbp + WORD_SIZE * (4 + "^(string_of_int minor)^")], rax"^"\n"^
                     "mov rax, SOB_VOID_ADDRESS"^"\n") "Set VarParam" )
     | Var'(VarBound(_, major, minor)) ->
-    (wrap_for_debug ("mov rax, qword [rbp + WORD_SIZE * 2]"^"\n"^
+      (wrap_for_debug ("mov rax, qword [rbp + WORD_SIZE * 2]"^"\n"^
                     "mov rax, qword [rax + WORD_SIZE * " ^ (string_of_int major )^"]"^"\n" ^
                     "mov rax, qword [rax + WORD_SIZE * " ^(string_of_int minor)^"]"^"\n") "VarBound")
     |Set'((VarBound(_,major, minor)),z)->
@@ -453,7 +564,12 @@ let wrap_for_debug body type_off= (working_on type_off) ^ body ^ (finish_working
                                   jmp rbx
                                   " )
                                            "ApplicTP")
-    | LambdaOpt'( _,_,body)-> raise X_not_yet_implemented_code_gen
+    | LambdaOpt'( required,_,body)-> let id=(string_of_int (new_id())) in
+                              let lambda_body=(generate consts fvars (env_size+1) body) in
+                              (wrap_for_debug(opt_lambda (List.length required)(string_of_int env_size) id lambda_body) "LambdaOPT")
+
+    
+    
     
     |_ ->  raise X_not_yet_implemented_code_gen
 

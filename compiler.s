@@ -29,6 +29,22 @@
 	pop rax
 %endmacro
 
+ %macro shift_frame_by_one 3
+	%assign i 0
+	%%macro_loop:
+	cmp %3,0 
+	je %%finish_macro
+		mov r10, i
+		dec r10
+		mov %2,[%1 - ((i-1) * WORD_SIZE)]
+		mov [%1-(i*WORD_SIZE)],%2
+		%assign i i+1
+		dec %3
+		jmp %%macro_loop
+	%%finish_macro:
+	add rsp , WORD_SIZE; just to delete it
+%endmacro
+
 %define NUMERATOR SKIP_TYPE_TAG
 
 %macro DENOMINATOR 2
