@@ -398,7 +398,7 @@ let wrap_for_debug body type_off= (working_on type_off) ^ body ^ (finish_working
     | ApplicTP'(proc ,args) ->  
                           let id=(string_of_int (new_id())) in
                           let magic = "push SOB_NIL_ADDRESS \n" in
-                          let args_push=(String.concat "\n" (List.map (fun arg-> (generate consts fvars env_size arg)^ "push rax \n                                   print_debug
+                          let args_push=(String.concat "\n" (List.map (fun arg-> (generate consts fvars env_size arg)^ "push rax \n 
                           ") (List.rev args))) 
                                           ^ "\n"^ "mov rbx, "^ (string_of_int (List.length args)) ^"\n" ^
                                           "push rbx\n"

@@ -124,20 +124,20 @@ let annotate_lexical_addresses e =
     (annotate_lexical_addresses_recursive e [] [])
   ;;
 (*\\\\\\\\\\\\\\\\\\\\\\\tail-calls/////////////////////////////// *)
-let rec tail_call exp =
-  match exp with 
-  | LambdaSimple'(x,Seq'(body))->LambdaSimple'(x,Seq'(make_TP_last_element body))
-  | LambdaSimple'(x,body) -> LambdaSimple'(x,make_TP body)
-  | LambdaOpt'(x,y,Seq'(body))-> LambdaOpt' (x,y,Seq'(make_TP_last_element body))
-  | LambdaOpt'(x,y,body) -> LambdaOpt' (x,y,make_TP body)
-  | If'(test, dit, dif)-> If'((tail_call test),(tail_call dit),(tail_call dif))
-  | Or'(lst)-> Or'(List.map (fun x->(tail_call x))lst)
-  | Seq'(lst) -> Seq' (make_TP_last_element lst)
-  | Set'(vari,exp) -> Set' (vari, (tail_call exp)) (*check if needed*)
-  | Def'(vari,exp) -> Def' (vari, (tail_call exp))
-  | Applic'(proc,lst) -> Applic'((tail_call proc),(List.map (fun x -> (tail_call x))lst))
-  | x -> x
 
+  let rec tail_call exp =
+    match exp with 
+    | LambdaSimple'(x,Seq'(body))->LambdaSimple'(x,Seq'(make_TP_last_element body))
+    | LambdaSimple'(x,body) -> LambdaSimple'(x,make_TP body)
+    | LambdaOpt'(x,y,Seq'(body))-> LambdaOpt' (x,y,Seq'(make_TP_last_element body))
+    | LambdaOpt'(x,y,body) -> LambdaOpt' (x,y,make_TP body)
+    | If'(test, dit, dif)-> If'((tail_call test),(tail_call dit),(tail_call dif))
+    | Or'(lst)-> Or'(List.map (fun x->(tail_call x))lst)
+    | Seq'(lst) -> Seq' (List.map tail_call lst)
+    | Set'(vari,exp) -> Set' (vari, (tail_call exp)) (*check if needed*)
+    | Def'(vari,exp) -> Def' (vari, (tail_call exp))
+    | Applic'(proc,lst) -> Applic'((tail_call proc),(List.map (fun x -> (tail_call x))lst))
+    | x -> x
 and make_TP = function
   |If'(test,dif,dit) -> If'((tail_call test),(make_TP (tail_call dif)),(make_TP (tail_call dit)))
   |Or' (lst) -> Or'(make_TP_last_element lst)
@@ -176,6 +176,7 @@ let rec box_recursive e=
   | Set'(vari,exp) -> BoxSet' (vari, (box_recursive exp)) 
   | Def'(vari,exp) -> Def' (vari, (box_recursive exp))
   | Applic'(proc,lst) -> Applic'((box_recursive proc),(List.map (fun x -> (box_recursive x))lst))
+  | ApplicTP'(proc,lst) -> ApplicTP'((box_recursive proc),(List.map (fun x -> (box_recursive x))lst))
   | Var'(VarParam (x,y)) ->  BoxGet'(VarParam (x,y))
   | Var'(VarBound (x,y,z))-> BoxGet'(VarBound (x,y,z))
   |x->x;;

@@ -1,5 +1,1 @@
-
-(define function_pass (lambda (f x y) (f x y)))
-function_pass
-
-(function_pass  + 1 2)  ; problem at 217 - ish
+(define x (lambda (x pred) (if pred x #f))) (define y (lambda () ((lambda () ((lambda () #t)))))) (begin 5 6 7 8 '(1 2 3) (x "PASS" (y)))
