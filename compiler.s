@@ -29,20 +29,26 @@
 	pop rax
 %endmacro
 
- %macro shift_frame_by_one 3
-	%assign i 0
+ %macro shift_frame_by_one 3  ;%1 registor point to top, %2 free register, %3 register says number of times 
+ 	push rbx
+	push rcx
+
+	mov rcx , -1
+	mov rbx,%1
+
 	%%macro_loop:
 	cmp %3,0 
 	je %%finish_macro
-		mov r10, i
-		dec r10
-		mov %2,[%1 - ((i-1) * WORD_SIZE)]
-		mov [%1-(i*WORD_SIZE)],%2
-		%assign i i+1
-		dec %3
+		mov %2,[rbx+ (rcx * WORD_SIZE)]
+		mov [rbx],%2
+		sub rbx,WORD_SIZE
+		dec %3	
 		jmp %%macro_loop
 	%%finish_macro:
+	pop rcx
+	pop rbx
 	add rsp , WORD_SIZE; just to delete it
+	
 %endmacro
 
 %define NUMERATOR SKIP_TYPE_TAG

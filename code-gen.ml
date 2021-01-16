@@ -233,7 +233,7 @@ let simple_lambda env_size id lambda_body =
   "finish_env_copy" ^ id ^ ":
 
   mov rbx, [rbp + 3 * WORD_SIZE]
-  inc rbx,1 ; for the magic
+  inc rbx ; for the magic
   ;cmp rbx,0
   ;jne allocate_args" ^ id ^ "\n"^
   ";mov rdx, SOB_NIL_ADDRESS
@@ -349,19 +349,19 @@ let simple_lambda env_size id lambda_body =
         cmp rsi,rdx
         je after_ops"^id^"
         mov r14, [r12]
-        MAKE_PAIR(r15,14,13)
+        MAKE_PAIR(r15,r14,r13)
         mov r13,r15
         mov r9,rcx
-        sub r9,rsi
-        add r9,2
+        add r9,3
         shift_frame_by_one r12, r15 , r9
         dec qword[rsp + (2*WORD_SIZE)]
+        inc rsi
         jmp loop"^id^"
 
 
         after_ops"^id^":
         mov r14 ,[r12]
-        MAKE_PAIR(r15,14,13)
+        MAKE_PAIR(r15,r14,r13)
         mov r13,r15
         mov [r12], r13
 
@@ -369,7 +369,6 @@ let simple_lambda env_size id lambda_body =
 
 
           continue_with_the_code"^id^":
-          inc qword[rsp+2*WORD_SIZE] ; add one for arg count for the optinal argument
           push rbp
           mov rbp,rsp \n" ^
         lambda_body ^"\n" ^

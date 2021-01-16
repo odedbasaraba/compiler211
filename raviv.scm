@@ -1,1 +1,1 @@
-(lambda (x . y) (lamda () y) )
+zero?
