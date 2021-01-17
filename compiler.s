@@ -29,6 +29,14 @@
 	pop rax
 %endmacro
 
+%macro print_that 1
+	push rax
+	mov rax,%1
+	print_debug
+	pop rax
+%endmacro
+
+
  %macro shift_frame_by_one 3  ;%1 registor point to top, %2 free register, %3 register says number of times 
  	push rbx
 	push rcx

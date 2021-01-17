@@ -201,7 +201,7 @@ let primitive_names_to_labels =
                                            (* Arithmetic ops *)
                                            ("+",168);("*",176);("/",184) ; ("=",192);("<",200);
                                            (* Additional rational numebr ops *)
-                                           ("numerator",208);("denominator",216);("gcd",224);("cons",232);("set-car!",240);("set-cdr!",248)] asts;;(*("apply",232)*)
+                                           ("numerator",208);("denominator",216);("gcd",224);("cons",232);("set-car!",240);("set-cdr!",248);("apply",256);] asts;;(*("apply",232)*)
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~make fvar table~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~Generate Strings~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)

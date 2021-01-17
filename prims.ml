@@ -319,9 +319,44 @@ module Prims : PRIMS = struct
          MAKE_RATIONAL(rax, rdx, 1)", make_binary, "gcd";  
       ] in
     String.concat "\n\n" (List.map (fun (a, b, c) -> (b c a)) misc_parts);;
+      
+    let apply = "
+    apply:
+    mov rbx,[rsp + (2 * WORD_SIZE)]
+    mov rcx, [rsp + (3 * WORD_SIZE)]
+    CLOSURE_ENV rdx , rcx
+    mov [rsp + (1 * WORD_SIZE)],rdx
+    mov r12, rbx
+    inc r12
+    shl r12 , 3
+    add r12 , rsp
+    mov r13,[r12 + (1 * WORD_SIZE)]
+    mov rsi,2
 
+    .apply_loop:
+    cmp rsi , rbx
+    je .finish
+    mov r14,[r12]
+    MAKE_PAIR(r15,r14,r13)
+    mov r13,r15
+    mov [r12 + (1 * WORD_SIZE)],r13
+    mov r9,rbx
+    sub r9,rsi
+    add r9,3
+    shift_frame_by_one r12, r15 , r9
+    dec qword[rsp + (2*WORD_SIZE)]
+    inc rsi
+    jmp .apply_loop
+
+    .finish:
+    mov r9,3
+    shift_frame_by_one r12, r15 , r9
+    dec qword[rsp + (2*WORD_SIZE)]
+    CLOSURE_CODE rdx,rcx
+    jmp rdx
+    "
   (* This is the interface of the module. It constructs a large x86 64-bit string using the routines
      defined above. The main compiler pipline code (in compiler.ml) calls into this module to get the
      string of primitive procedures. *)
-  let procs = String.concat "\n\n" [type_queries ; numeric_ops; misc_ops];;
+  let procs = String.concat "\n\n" [apply ; type_queries ; numeric_ops; misc_ops];;
 end;;
