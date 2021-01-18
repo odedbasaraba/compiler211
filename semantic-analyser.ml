@@ -172,7 +172,7 @@ let rec box_recursive e=
   | If'(test, dit, dif)-> If'((box_recursive test),(box_recursive dit),(box_recursive dif))
   | Or'(lst)-> Or'(List.map (fun x->(box_recursive x))lst)
   | Seq'(lst) -> Seq' (List.map box_recursive lst)
-  | Set'(VarFree (var_free),exp) ->  Set'(VarFree (var_free),exp)
+  | Set'(VarFree (var_free),exp) ->  Set'(VarFree (var_free),(box_recursive exp))
   | Set'(vari,exp) -> BoxSet' (vari, (box_recursive exp)) 
   | Def'(vari,exp) -> Def' (vari, (box_recursive exp))
   | Applic'(proc,lst) -> Applic'((box_recursive proc),(List.map (fun x -> (box_recursive x))lst))
