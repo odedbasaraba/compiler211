@@ -246,7 +246,7 @@ let pair_up_list_2 lst cdr=match cdr with
 (* /////////////////////////////////////////////////////// Raviv  - parenthasis *)
 let throw_away _= [];;
 let sexpr_comments_prefix str = (pack (make_spaced (caten (char '#') (char ';') )) (throw_away))  str;;
-let line_cmt str = (caten (char ';') (star (diff nt_any (disj (char '\n') (pack nt_end_of_input (fun e->'\n')))))) str;; 
+let line_cmt str = (caten (char ';') (caten (star (diff nt_any (disj (char '\n') (pack nt_end_of_input (fun e->'\n'))))) (disj (char '\n') (pack nt_end_of_input (fun e->'\n')) )  )) str;; 
 let line_comment str =(caten (pack (char ';') throw_away )(disj (star (diff nt_any (caten (char '\\')(char 'n')) )) (star(diff nt_any nt_end_of_input)))) str ;;
 (* //////////////////////////////////////////////////////// Raviv - comments *)
 let rec sexpr_pars str= make_spaced  (

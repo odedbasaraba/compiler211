@@ -1,6 +1,7 @@
 
 #use "code-gen.ml";;
 #use "prims.ml";;
+exception X_missing_input_file;;
 
 
 let till_3 program= List.map Semantics.run_semantics

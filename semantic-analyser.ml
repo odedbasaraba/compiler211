@@ -172,16 +172,39 @@ let rec box_recursive e=
   | If'(test, dit, dif)-> If'((box_recursive test),(box_recursive dit),(box_recursive dif))
   | Or'(lst)-> Or'(List.map (fun x->(box_recursive x))lst)
   | Seq'(lst) -> Seq' (List.map box_recursive lst)
-  | Set'(VarFree (var_free),exp) ->  Set'(VarFree (var_free),exp)
+  | Set'(VarFree (var_free),exp) ->  Set'(VarFree (var_free),box_recursive exp)
   | Set'(vari,exp) -> BoxSet' (vari, (box_recursive exp)) 
   | Def'(vari,exp) -> Def' (vari, (box_recursive exp))
   | Applic'(proc,lst) -> Applic'((box_recursive proc),(List.map (fun x -> (box_recursive x))lst))
   | ApplicTP'(proc,lst) -> ApplicTP'((box_recursive proc),(List.map (fun x -> (box_recursive x))lst))
   | Var'(VarParam (x,y)) ->  BoxGet'(VarParam (x,y))
-  | Var'(VarBound (x,y,z))-> BoxGet'(VarBound (x,y,z))
-  |x->x;;
+  | Var'(VarBound (x,y,z))-> BoxGet'(VarBound (x ,y,z))
+
+  | x-> x;;
 let box_set e = (box_recursive e);;
 
+(* #use "tag-parser.ml";;
+
+type var = 
+  | VarFree of string
+  | VarParam of string * int
+  | VarBound of string * int * int;;
+
+type expr' =
+  | Const' of constant
+  | Var' of var
+  | Box' of var
+  | BoxGet' of var
+  | BoxSet' of var * expr'
+  | If' of expr' * expr' * expr'
+  | Seq' of expr' list
+  | Set' of var * expr'
+  | Def' of var * expr'
+  | Or' of expr' list
+  | LambdaSimple' of string list * expr'
+  | LambdaOpt' of string list * string * expr'
+  | Applic' of expr' * (expr' list)
+  | ApplicTP' of expr' * (expr' list);; *)
 let run_semantics expr =
   box_set(
     annotate_tail_calls

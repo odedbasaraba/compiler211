@@ -322,6 +322,7 @@ module Prims : PRIMS = struct
       
     let apply = "
     apply:
+
     mov rbx,[rsp + (2 * WORD_SIZE)]
     mov rcx, [rsp + (3 * WORD_SIZE)]
     CLOSURE_ENV rdx , rcx
@@ -334,8 +335,10 @@ module Prims : PRIMS = struct
     mov rsi,2
 
     .apply_loop:
+    
     cmp rsi , rbx
     je .finish
+
     mov r14,[r12]
     MAKE_PAIR(r15,r14,r13)
     mov r13,r15
@@ -350,6 +353,7 @@ module Prims : PRIMS = struct
 
     .finish:
     mov r9,3
+
     shift_frame_by_one r12, r15 , r9
     dec qword[rsp + (2*WORD_SIZE)]
     CLOSURE_CODE rdx,rcx
