@@ -36,7 +36,11 @@
 	pop rax
 %endmacro
 
-
+%macro shift_frame_fix 3
+    sub %1 , WORD_SIZE 
+    shift_frame_by_one %1, %2 , %3
+    add %1 , WORD_SIZE  ; i mistakenly used the macro up
+%endmacro
  %macro shift_frame_by_one 3  ;%1 registor point to top, %2 free register, %3 register says number of times 
  	push rbx
 	push rcx
@@ -59,6 +63,22 @@
 	
 %endmacro
 
+%macro shift_frame_down_by_one 3  ;%1 registor point to top, %2 free register, %3 free reggister
+	mov %2,rsp
+
+	%%down:
+	cmp %1,%2
+	je %%end_down
+
+	mov %3,[%2]
+	mov[%2-WORD_SIZE],%3
+	add %2,WORD_SIZE
+	jmp %%down
+
+	%%end_down:
+	sub rsp, WORD_SIZE
+
+%endmacro
 %define NUMERATOR SKIP_TYPE_TAG
 
 %macro DENOMINATOR 2
@@ -128,6 +148,7 @@
 %define MAKE_VOID db T_VOID
 %define MAKE_LITERAL_BOOL(val) MAKE_LITERAL T_BOOL, db val
 %define MAKE_LITERAL_SYMBOL(val) MAKE_LITERAL T_SYMBOL, dq val
+%define MAKE_LITERAL_FLOAT(val)  MAKE_LITERAL T_FLOAT, dq val
 
 %macro MAKE_LITERAL_STRING 1
 	db T_STRING

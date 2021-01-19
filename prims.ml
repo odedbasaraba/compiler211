@@ -321,40 +321,59 @@ module Prims : PRIMS = struct
     String.concat "\n\n" (List.map (fun (a, b, c) -> (b c a)) misc_parts);;
       
     let apply = "
+
     apply:
-    mov rbx,[rsp + (2 * WORD_SIZE)]
     mov rcx, [rsp + (3 * WORD_SIZE)]
     CLOSURE_ENV rdx , rcx
     mov [rsp + (1 * WORD_SIZE)],rdx
-    mov r12, rbx
-    inc r12
+    mov r12, 4
     shl r12 , 3
-    add r12 , rsp
-    mov r13,[r12 + (1 * WORD_SIZE)]
-    mov rsi,2
-
-    .apply_loop:
-    cmp rsi , rbx
-    je .finish
-    mov r14,[r12]
-    MAKE_PAIR(r15,r14,r13)
-    mov r13,r15
-    mov [r12 + (1 * WORD_SIZE)],r13
-    mov r9,rbx
-    sub r9,rsi
-    add r9,3
-    shift_frame_by_one r12, r15 , r9
-    dec qword[rsp + (2*WORD_SIZE)]
-    inc rsi
-    jmp .apply_loop
-
-    .finish:
+    add r12,rsp
     mov r9,3
-    shift_frame_by_one r12, r15 , r9
-    dec qword[rsp + (2*WORD_SIZE)]
+    shift_frame_fix r12, r15 , r9
+    dec qword[rsp + (2 * WORD_SIZE)] 
+    mov rbx,[rsp + (2 * WORD_SIZE)] 
+    mov r12,rbx
+    add r12,2
+    shl r12,3 
+    add r12 , rsp
+
+    ext_loop:
+
+       push qword[r12]
+       push 1
+       push SOB_NIL_ADDRESS
+       call null?
+       add rsp,WORD_SIZE
+       add rsp,WORD_SIZE
+       add rsp,WORD_SIZE
+
+	cmp rax, SOB_TRUE_ADDRESS
+      je empty_list_left
+       shift_frame_down_by_one r12, r15 , r9
+
+    mov r13,[r12]
+       mov r15,[r13+TYPE_SIZE]
+    mov [r12 - WORD_SIZE],r15
+    inc qword[rsp + (2*WORD_SIZE)] ; add one to arg_count
+
+       mov r15,[r13+TYPE_SIZE+WORD_SIZE]
+       mov [r12] ,r15
+
+    jmp ext_loop
+
+    empty_list_left:
+    add r12, WORD_SIZE ; take it up the stack
+    mov rbx,[rsp + (2 * WORD_SIZE)]  ; update rbx to have new args_count
+    mov r9,rbx
+    add r9,2
+    
+    shift_frame_fix r12, r15 , r9
+    dec qword[rsp +(2*WORD_SIZE)]
+
     CLOSURE_CODE rdx,rcx
-    jmp rdx
-    "
+    jmp rdx  
+        "
   (* This is the interface of the module. It constructs a large x86 64-bit string using the routines
      defined above. The main compiler pipline code (in compiler.ml) calls into this module to get the
      string of primitive procedures. *)
